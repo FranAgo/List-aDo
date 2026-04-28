@@ -23,6 +23,8 @@
       --accent-text: #1a1a00;
       --red:         #ff5f5f;
       --red-dim:     rgba(255,95,95,0.1);
+      --yellow:      #f0c040;
+      --yellow-dim:  rgba(240,192,64,0.1);
       --radius:      12px;
       --radius-sm:   7px;
     }
@@ -112,7 +114,9 @@
     .stats-pill          { display: flex; gap: 1px; background: var(--border); border-radius: 20px; overflow: hidden; font-family: 'DM Mono', monospace; font-size: 0.6875rem; }
     .stat-item           { padding: 5px 11px; background: var(--surface); color: var(--text2); white-space: nowrap; }
     .stat-item span      { color: var(--text); font-weight: 500; }
-    .stat-item.over span { color: var(--red); }
+    .stat-item.over span  { color: var(--red); }
+    .stat-item.soon span  { color: var(--yellow); }
+    .soon-chip            { font-size: 0.625rem; font-family: 'DM Mono', monospace; color: var(--yellow); background: var(--yellow-dim); border: 1px solid rgba(240,192,64,0.25); border-radius: 20px; padding: 1px 7px; }
     .logout-btn          { background: transparent; border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 5px 12px; color: var(--text3); font-size: 0.75rem; cursor: pointer; font-family: 'DM Sans', sans-serif; transition: all .12s; }
     .logout-btn:hover    { color: var(--text2); }
 
@@ -369,6 +373,7 @@
       <div class="stats-pill">
         <div class="stat-item">Total <span id="s-total">0</span></div>
         <div class="stat-item">Pendientes <span id="s-pend">0</span></div>
+        <div class="stat-item soon">Por vencer <span id="s-soon">0</span></div>
         <div class="stat-item over">Vencidas <span id="s-over">0</span></div>
       </div>
       <button class="logout-btn" id="logout-btn">Salir</button>
@@ -656,13 +661,11 @@
     if (lo) {
       try { listOrder = JSON.parse(lo); } catch(e) { listOrder = []; }
     }
-    renderCatBar();
     document.getElementById('view-container').innerHTML =
       '<div class="loading-wrap"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
-    const [cats, tks] = await Promise.all([
-      api({ action: 'getCategories' }),
-      api({ action: 'getTasks' })
-    ]);
+    const result = await api({ action: 'getAll' });
+    const cats = result.categories;
+    const tks  = result.tasks;
     if (Array.isArray(cats)) {
       categories = cats;
       categories.forEach(c => assignCatColor(c));
@@ -702,11 +705,22 @@
     return !!(d && !t.done && d < new Date());
   }
 
+  function isSoonDue(t) {
+    if (!t.due || t.done) return false;
+    const d = parseLocalDate(t.due);
+    if (!d) return false;
+    const now = new Date();
+    if (d < now) return false; // ya vencida, no "por vencer"
+    const twoDaysFromNow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 23, 59, 59);
+    return d <= twoDaysFromNow;
+  }
+
   // ─── STATS ─────────────────────────────────────────────────────────────────
   function updateStats() {
     const active = tasks.filter(t => !t.done);
     document.getElementById('s-total').textContent = active.length;
     document.getElementById('s-pend').textContent  = active.filter(t => !isOverdue(t)).length;
+    document.getElementById('s-soon').textContent  = active.filter(t => isSoonDue(t)).length;
     document.getElementById('s-over').textContent  = active.filter(t => isOverdue(t)).length;
   }
 
@@ -868,7 +882,7 @@
     requestAnimationFrame(() => {
       el.querySelectorAll('.task-card').forEach((c, i) => {
         c.classList.add('anim-in');
-        c.style.animationDelay = (i * 38) + 'ms';
+        c.style.animationDelay = (i * 18) + 'ms';
       });
       setupDrag(el, viewCat);
     });
@@ -881,6 +895,7 @@
     let meta = '';
     if (viewCat === 'today') meta += `<span class="task-cat-badge" style="background:${catCol.bg};border-color:${catCol.border};color:${catCol.text}">${esc(t.category||'')}</span>`;
     if (t.due) meta += `<span class="date-chip ${over?'overdue':''}">${over?'⚠ ':''}${fmtDate(t.due)}</span>`;
+    if (!over && isSoonDue(t)) meta += `<span class="soon-chip">por vencer</span>`;
     let actions = '';
     if (viewCat === 'today') {
       actions += locked
