@@ -13,23 +13,29 @@
 
     /* ─── DESIGN TOKENS ──────────────────────────────────────────────────────── */
     :root {
-      --bg:          #0e0e0f;
-      --surface:     #161617;
-      --surface2:    #1e1e20;
-      --border:      rgba(255, 255, 255, 0.07);
-      --border2:     rgba(255, 255, 255, 0.13);
-      --text:        #f0ede8;
+      --bg:          #0b0b0c;
+      --surface:     #131314;
+      --surface2:    #1c1c1e;
+      --surface3:    #232326;
+      --border:      rgba(255, 255, 255, 0.075);
+      --border2:     rgba(255, 255, 255, 0.15);
+      --border3:     rgba(255, 255, 255, 0.22);
+      --text:        #f2ede7;
       --text2:       #8a8784;
-      --text3:       #555350;
+      --text3:       #4e4c4a;
       --accent:      #c8f060;
       --accent-dim:  rgba(200, 240, 96, 0.12);
-      --accent-text: #1a1a00;
+      --accent-glow: rgba(200, 240, 96, 0.18);
+      --accent-text: #141a00;
       --red:         #ff5f5f;
       --red-dim:     rgba(255, 95, 95, 0.1);
       --yellow:      #f0c040;
       --yellow-dim:  rgba(240, 192, 64, 0.1);
-      --radius:      12px;
-      --radius-sm:   7px;
+      --radius:      14px;
+      --radius-sm:   8px;
+      --shadow-sm:   0 2px 8px rgba(0, 0, 0, 0.35);
+      --shadow-md:   0 8px 28px rgba(0, 0, 0, 0.55);
+      --shadow-lg:   0 16px 48px rgba(0, 0, 0, 0.7);
     }
 
     /* ─── RESET & BASE ───────────────────────────────────────────────────────── */
@@ -42,6 +48,7 @@
     html {
       font-size: 25px;
       -webkit-font-smoothing: antialiased;
+      scroll-behavior: smooth;
     }
 
     body {
@@ -61,17 +68,29 @@
       padding: 2rem;
       position: relative;
       overflow: hidden;
+      background: radial-gradient(ellipse 80% 60% at 50% -10%, rgba(200, 240, 96, 0.055) 0%, transparent 65%),
+                  var(--bg);
     }
 
     #login-screen::before {
       content: '';
       position: absolute;
-      width: 600px;
-      height: 600px;
-      background: radial-gradient(circle, rgba(200, 240, 96, 0.06) 0%, transparent 70%);
-      top: -100px;
+      width: 700px;
+      height: 700px;
+      background: radial-gradient(circle, rgba(200, 240, 96, 0.04) 0%, transparent 65%);
+      top: -200px;
       left: 50%;
       transform: translateX(-50%);
+      pointer-events: none;
+    }
+
+    #login-screen::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image:
+        radial-gradient(circle at 20% 80%, rgba(120, 180, 255, 0.025) 0%, transparent 50%),
+        radial-gradient(circle at 80% 20%, rgba(200, 140, 255, 0.02) 0%, transparent 50%);
       pointer-events: none;
     }
 
@@ -79,6 +98,13 @@
       width: 100%;
       max-width: 360px;
       animation: fadeUp .5s ease both;
+      background: var(--surface);
+      border: 1px solid var(--border2);
+      border-radius: 20px;
+      padding: 2.25rem 2rem 2rem;
+      box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.06);
+      position: relative;
+      z-index: 1;
     }
 
     .login-logo {
@@ -112,7 +138,7 @@
 
     .login-input {
       width: 100%;
-      background: var(--surface);
+      background: var(--bg);
       border: 1px solid var(--border2);
       border-radius: var(--radius-sm);
       padding: 12px 16px;
@@ -121,12 +147,13 @@
       font-family: 'DM Mono', monospace;
       letter-spacing: .08em;
       outline: none;
-      transition: border-color .15s;
+      transition: border-color .15s, box-shadow .15s;
       margin-bottom: 12px;
     }
 
     .login-input:focus {
       border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-glow);
     }
 
     .login-btn {
@@ -140,11 +167,40 @@
       font-weight: 500;
       font-family: 'DM Sans', sans-serif;
       cursor: pointer;
-      transition: opacity .15s, transform .1s;
+      transition: opacity .15s, transform .1s, box-shadow .15s;
+      box-shadow: 0 4px 16px rgba(200, 240, 96, 0.25);
     }
 
-    .login-btn:hover  { opacity: .88; }
+    .login-btn:hover  { opacity: .88; box-shadow: 0 4px 24px rgba(200, 240, 96, 0.40); }
     .login-btn:active { transform: scale(.98); }
+
+    .login-input-wrap {
+      position: relative;
+      margin-bottom: 12px;
+    }
+
+    .login-input-wrap .login-input {
+      margin-bottom: 0;
+      padding-right: 42px;
+    }
+
+    .login-eye-btn {
+      position: absolute;
+      right: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      background: none;
+      border: none;
+      padding: 4px;
+      cursor: pointer;
+      color: var(--text3);
+      line-height: 1;
+      transition: color .12s;
+      display: flex;
+      align-items: center;
+    }
+
+    .login-eye-btn:hover { color: var(--text2); }
 
     .login-error {
       font-size: 0.75rem;
@@ -165,18 +221,19 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 1.25rem 1.5rem;
-      border-bottom: 1px solid var(--border);
+      padding: 1rem 1.5rem;
+      border-bottom: 1px solid var(--border2);
       position: sticky;
       top: 0;
-      background: rgba(14, 14, 15, .93);
-      backdrop-filter: blur(12px);
+      background: rgba(11, 11, 12, .95);
+      backdrop-filter: blur(16px);
       z-index: 10;
+      box-shadow: 0 1px 0 rgba(255,255,255,0.04), 0 4px 20px rgba(0,0,0,0.4);
     }
 
     .topbar-logo {
       font-family: 'Instrument Serif', serif;
-      font-size: 1.375rem;
+      font-size: 1.4rem;
       letter-spacing: -.5px;
       color: var(--text);
     }
@@ -191,24 +248,44 @@
 
     .stats-pill {
       display: flex;
-      gap: 1px;
-      background: var(--border);
-      border-radius: 20px;
-      overflow: hidden;
+      align-items: center;
+      gap: 3px;
       font-family: 'DM Mono', monospace;
-      font-size: 0.6875rem;
     }
 
     .stat-item {
-      padding: 5px 11px;
-      background: var(--surface);
-      color: var(--text2);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 5px 13px;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      gap: 1px;
       white-space: nowrap;
+      min-width: 60px;
     }
 
-    .stat-item span       { color: var(--text); font-weight: 500; }
-    .stat-item.over span  { color: var(--red); }
-    .stat-item.soon span  { color: var(--yellow); }
+    .stat-item .stat-label {
+      font-size: 0.5rem;
+      text-transform: uppercase;
+      letter-spacing: .08em;
+      color: var(--text3);
+      font-weight: 500;
+    }
+
+    .stat-item .stat-val {
+      font-size: 1rem;
+      font-weight: 500;
+      color: var(--text);
+      line-height: 1.1;
+      letter-spacing: -.03em;
+    }
+
+    .stat-item.over .stat-val  { color: var(--red); }
+    .stat-item.soon .stat-val  { color: var(--yellow); }
+    .stat-item.over            { border-color: rgba(255,95,95,.2); background: rgba(255,95,95,.06); }
+    .stat-item.soon            { border-color: rgba(240,192,64,.2); background: rgba(240,192,64,.05); }
 
     .soon-chip {
       font-size: 0.625rem;
@@ -232,7 +309,7 @@
       transition: all .12s;
     }
 
-    .logout-btn:hover { color: var(--text2); }
+    .logout-btn:hover { color: var(--text2); border-color: var(--border3); }
 
     /* ─── MAIN CONTENT AREA ──────────────────────────────────────────────────── */
     .main {
@@ -251,25 +328,26 @@
     }
 
     .cat-btn {
-      background: transparent;
-      border: 1px solid var(--border);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
       border-radius: 20px;
-      padding: 6px 14px;
+      padding: 6px 15px;
       font-size: 0.75rem;
-      color: var(--text3);
+      color: var(--text2);
       cursor: pointer;
       font-family: 'DM Sans', sans-serif;
-      transition: all .12s;
+      transition: all .15s;
       white-space: nowrap;
       display: flex;
       align-items: center;
       gap: 5px;
+      box-shadow: var(--shadow-sm);
     }
 
-    .cat-btn:hover  { border-color: var(--border2); color: var(--text2); }
-    .cat-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 500; }
+    .cat-btn:hover  { border-color: var(--border3); color: var(--text); background: var(--surface3); }
+    .cat-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 500; box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-sm); }
 
-    .cat-count { font-size: 0.625rem; opacity: .7; }
+    .cat-count { font-size: 0.625rem; opacity: .65; }
 
     .new-cat-btn {
       background: transparent;
@@ -283,7 +361,7 @@
       transition: all .12s;
     }
 
-    .new-cat-btn:hover { border-color: var(--border2); color: var(--text2); }
+    .new-cat-btn:hover { border-color: var(--border3); color: var(--text2); background: var(--surface2); }
 
     .cat-drop-indicator {
       width: 2px;
@@ -299,15 +377,17 @@
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 1rem;
+      margin-bottom: 1.1rem;
       gap: 12px;
       flex-wrap: wrap;
+      padding-bottom: .9rem;
+      border-bottom: 1px solid var(--border);
     }
 
     .view-title {
       font-family: 'Instrument Serif', serif;
-      font-size: 1.625rem;
-      letter-spacing: -.3px;
+      font-size: 1.7rem;
+      letter-spacing: -.4px;
       color: var(--text);
     }
 
@@ -322,19 +402,19 @@
     .search-wrap { position: relative; }
 
     .search-inp {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
       border-radius: 20px;
       padding: 6px 14px 6px 32px;
       font-size: 0.75rem;
       color: var(--text);
       font-family: 'DM Sans', sans-serif;
       outline: none;
-      transition: border-color .12s;
+      transition: border-color .12s, box-shadow .12s;
       width: 180px;
     }
 
-    .search-inp:focus { border-color: var(--border2); }
+    .search-inp:focus { border-color: var(--border3); box-shadow: 0 0 0 3px var(--accent-glow); }
 
     .search-icon {
       position: absolute;
@@ -356,24 +436,25 @@
       font-weight: 500;
       font-family: 'DM Sans', sans-serif;
       cursor: pointer;
-      transition: opacity .15s, transform .1s;
+      transition: opacity .15s, transform .1s, box-shadow .15s;
       white-space: nowrap;
+      box-shadow: 0 3px 12px rgba(200, 240, 96, 0.22);
     }
 
-    .new-task-btn:hover  { opacity: .85; }
+    .new-task-btn:hover  { opacity: .88; box-shadow: 0 4px 20px rgba(200, 240, 96, 0.38); }
     .new-task-btn:active { transform: scale(.97); }
 
     /* ─── TASK CARDS ─────────────────────────────────────────────────────────── */
     .tasks-list {
       display: flex;
       flex-direction: column;
-      gap: 6px;
+      gap: 8px;
       min-height: 60px;
     }
 
     .task-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
+      background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%);
+      border: 1px solid var(--border2);
       border-radius: var(--radius);
       padding: 14px 16px;
       display: flex;
@@ -381,15 +462,16 @@
       align-items: flex-start;
       position: relative;
       user-select: none;
-      transition: border-color .15s, opacity .25s;
+      transition: border-color .15s, opacity .25s, transform .18s cubic-bezier(.25, .8, .25, 1), box-shadow .18s;
+      box-shadow: var(--shadow-sm), inset 0 1px 0 rgba(255,255,255,0.05);
     }
 
-    .task-card:hover                  { border-color: var(--border2); }
-    .task-card.done-card              { opacity: .42; }
+    .task-card:hover                  { border-color: var(--border3); transform: translateY(-3px); box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.07); }
+    .task-card.done-card              { opacity: .38; }
     .task-card.done-card .task-title  { color: var(--text3); }
-    .task-card.dragging               { opacity: .35; border-color: var(--accent); }
+    .task-card.dragging               { opacity: .3; border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-glow); }
     .task-card.drag-over              { border-top: 2px solid var(--accent); }
-    .task-card[data-overdue="true"]   { border-left: 2px solid var(--red); }
+    .task-card[data-overdue="true"]   { border-left: 3px solid var(--red); background: linear-gradient(160deg, rgba(255,95,95,0.06) 0%, var(--surface) 40%); }
 
     /* Task card — strikethrough animation */
     .task-title {
@@ -460,21 +542,21 @@
     }
 
     .check-btn {
-      width: 18px;
-      height: 18px;
+      width: 20px;
+      height: 20px;
       border-radius: 50%;
-      border: 1.5px solid var(--border2);
+      border: 1.5px solid var(--border3);
       background: transparent;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      transition: all .15s;
+      transition: all .2s cubic-bezier(.34, 1.56, .64, 1);
       padding: 0;
     }
 
-    .check-btn:hover      { border-color: var(--accent); }
-    .check-btn.checked    { background: var(--accent); border-color: var(--accent); }
+    .check-btn:hover      { border-color: var(--accent); background: var(--accent-dim); }
+    .check-btn.checked    { background: var(--accent); border-color: var(--accent); transform: scale(1.25); box-shadow: 0 0 0 3px var(--accent-glow); }
     .check-btn.checked svg { opacity: 1; }
 
     .check-btn svg {
@@ -507,9 +589,9 @@
       padding: 2px 9px;
       font-size: 0.6875rem;
       font-family: 'DM Mono', monospace;
-      background: var(--surface2);
-      color: var(--text3);
-      border: 1px solid var(--border);
+      background: var(--surface3);
+      color: var(--text2);
+      border: 1px solid var(--border2);
     }
 
     .date-chip {
@@ -518,12 +600,13 @@
       color: var(--text3);
     }
 
-    .date-chip.overdue { color: var(--red); }
+    .date-chip.overdue { color: var(--red); font-weight: 500; }
 
     .task-actions {
       display: flex;
       gap: 4px;
-      opacity: 0;
+      /* Always visible at low opacity so users know the buttons exist */
+      opacity: 0.28;
       transition: opacity .12s;
       flex-shrink: 0;
     }
@@ -646,8 +729,8 @@
     .modal-bg {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, .6);
-      backdrop-filter: blur(4px);
+      background: rgba(0, 0, 0, .7);
+      backdrop-filter: blur(6px);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -661,19 +744,20 @@
     .modal-bg.open { opacity: 1; pointer-events: all; }
 
     .modal {
-      background: var(--surface);
-      border: 1px solid var(--border2);
+      background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 55%);
+      border: 1px solid var(--border3);
       border-radius: var(--radius);
       padding: 1.75rem;
       width: 100%;
       max-width: 460px;
       max-height: 90vh;
       overflow-y: auto;
-      transform: translateY(16px) scale(.97);
-      transition: transform .22s cubic-bezier(.25, .8, .25, 1);
+      transform: translateY(20px);
+      transition: transform .22s cubic-bezier(.34, 1.28, .64, 1);
+      box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07);
     }
 
-    .modal-bg.open .modal { transform: translateY(0) scale(1); }
+    .modal-bg.open .modal { transform: translateY(0); }
 
     .modal-title {
       font-family: 'Instrument Serif', serif;
@@ -708,16 +792,16 @@
       font-family: 'DM Sans', sans-serif;
       font-weight: 300;
       outline: none;
-      transition: border-color .12s;
+      transition: border-color .12s, box-shadow .12s;
       resize: vertical;
     }
 
     .field input:focus,
     .field textarea:focus,
-    .field select:focus { border-color: rgba(200, 240, 96, .5); }
+    .field select:focus { border-color: rgba(200, 240, 96, .55); box-shadow: 0 0 0 3px var(--accent-glow); }
 
     .field input[type="date"] { color-scheme: dark; }
-    .field select option       { background: var(--surface); }
+    .field select option       { background: var(--surface2); }
 
     .modal-actions {
       display: flex;
@@ -738,7 +822,7 @@
       transition: all .12s;
     }
 
-    .btn-cancel:hover { color: var(--text2); }
+    .btn-cancel:hover { color: var(--text2); border-color: var(--border3); }
 
     .btn-save {
       background: var(--accent);
@@ -750,10 +834,16 @@
       font-weight: 500;
       font-family: 'DM Sans', sans-serif;
       cursor: pointer;
-      transition: opacity .15s;
+      transition: opacity .15s, box-shadow .15s;
+      box-shadow: 0 3px 12px rgba(200, 240, 96, 0.22);
     }
 
-    .btn-save:hover { opacity: .85; }
+    .btn-save:hover { opacity: .88; box-shadow: 0 4px 20px rgba(200, 240, 96, 0.40); }
+    .btn-save:disabled {
+      opacity: .5;
+      cursor: not-allowed;
+      box-shadow: none;
+    }
 
     /* ─── DATE INPUT ─────────────────────────────────────────────────────────── */
     .date-text-inp {
@@ -791,6 +881,109 @@
     .date-hint.ok  { color: var(--accent); }
     .date-hint.err { color: var(--red); }
 
+    /* ─── DATE FIELD WITH CALENDAR TOGGLE ───────────────────────────────────── */
+    .date-field-row {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+
+    .date-field-row .date-text-inp {
+      flex: 1;
+    }
+
+    .cal-toggle-btn {
+      flex-shrink: 0;
+      background: var(--surface2);
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 9px 11px;
+      color: var(--text3);
+      cursor: pointer;
+      font-size: 0.875rem;
+      line-height: 1;
+      transition: border-color .12s, color .12s, background .12s;
+    }
+
+    .cal-toggle-btn:hover  { border-color: var(--border3); color: var(--text2); background: var(--surface3); }
+    .cal-toggle-btn.active { border-color: rgba(200,240,96,.5); color: var(--accent); background: var(--accent-dim); }
+
+    /* Mini calendar popup */
+    .cal-popup {
+      margin-top: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border3);
+      border-radius: var(--radius);
+      padding: 12px;
+      box-shadow: var(--shadow-md);
+      animation: fadeUp .18s ease both;
+      user-select: none;
+    }
+
+    .cal-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+
+    .cal-nav-btn {
+      background: transparent;
+      border: none;
+      color: var(--text3);
+      cursor: pointer;
+      padding: 4px 8px;
+      border-radius: var(--radius-sm);
+      font-size: 0.875rem;
+      line-height: 1;
+      transition: background .1s, color .1s;
+    }
+
+    .cal-nav-btn:hover { background: var(--surface3); color: var(--text2); }
+
+    .cal-month-label {
+      font-size: 0.8125rem;
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 500;
+      color: var(--text);
+      letter-spacing: .01em;
+    }
+
+    .cal-grid {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 2px;
+    }
+
+    .cal-dow {
+      text-align: center;
+      font-size: 0.5625rem;
+      font-family: 'DM Mono', monospace;
+      color: var(--text3);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      padding: 3px 0 5px;
+    }
+
+    .cal-day {
+      text-align: center;
+      font-size: 0.75rem;
+      font-family: 'DM Mono', monospace;
+      padding: 5px 2px;
+      border-radius: 6px;
+      cursor: pointer;
+      color: var(--text2);
+      transition: background .1s, color .1s;
+      line-height: 1.4;
+    }
+
+    .cal-day:hover             { background: var(--surface3); color: var(--text); }
+    .cal-day.empty             { cursor: default; }
+    .cal-day.today-marker      { color: var(--accent); font-weight: 500; }
+    .cal-day.selected          { background: var(--accent); color: var(--accent-text); font-weight: 500; }
+    .cal-day.selected:hover    { background: var(--accent); opacity: .9; }
+    .cal-day.past              { opacity: .35; }
+
     /* ─── LOADING INDICATOR ──────────────────────────────────────────────────── */
     .loading-wrap {
       display: flex;
@@ -814,35 +1007,65 @@
     .dot:nth-child(2) { animation-delay: .2s; }
     .dot:nth-child(3) { animation-delay: .4s; }
 
+    .loading-label {
+      margin-left: 4px;
+      font-size: 0.75rem;
+      color: var(--text3);
+      font-family: 'DM Mono', monospace;
+      letter-spacing: .04em;
+    }
+
     /* ─── TOAST ──────────────────────────────────────────────────────────────── */
     .toast {
       position: fixed;
       bottom: 1.5rem;
       left: 50%;
-      transform: translateX(-50%) translateY(16px);
-      background: var(--surface2);
-      border: 1px solid var(--border2);
+      translate: -50% 16px;
+      background: var(--surface3);
+      border: 1px solid var(--border3);
       color: var(--text);
-      padding: 10px 20px;
+      padding: 10px 18px;
       border-radius: 20px;
       font-size: 0.8125rem;
       font-family: 'DM Mono', monospace;
       opacity: 0;
-      transition: all .25s;
+      transition: translate .25s cubic-bezier(.25, .8, .25, 1), opacity .25s;
       z-index: 200;
       pointer-events: none;
       white-space: nowrap;
+      box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.07);
+      display: flex;
+      align-items: center;
+      gap: 12px;
     }
 
     .toast.show {
       opacity: 1;
-      transform: translateX(-50%) translateY(0);
+      translate: -50% 0;
+      pointer-events: all;
     }
+
+    /* Undo button inside toast */
+    .toast-undo-btn {
+      background: transparent;
+      border: 1px solid var(--border3);
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 0.6875rem;
+      color: var(--accent);
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: .04em;
+      transition: background .12s, border-color .12s;
+      flex-shrink: 0;
+    }
+
+    .toast-undo-btn:hover { background: var(--accent-dim); border-color: rgba(200,240,96,.4); }
 
     /* ─── GLOBAL SEARCH ──────────────────────────────────────────────────────── */
     .global-search-btn {
-      background: transparent;
-      border: 1px dashed var(--border2);
+      background: var(--surface2);
+      border: 1px solid var(--border2);
       border-radius: 20px;
       padding: 6px 12px;
       font-size: 0.875rem;
@@ -850,18 +1073,20 @@
       cursor: pointer;
       transition: all .12s;
       line-height: 1;
+      box-shadow: var(--shadow-sm);
     }
 
-    .global-search-btn:hover  { color: var(--accent); border-color: var(--accent); }
-    .global-search-btn.active { color: var(--accent); border-color: var(--accent); background: var(--accent-dim); }
+    .global-search-btn:hover  { color: var(--accent); border-color: rgba(200,240,96,.4); background: var(--surface3); }
+    .global-search-btn.active { color: var(--accent); border-color: rgba(200,240,96,.5); background: var(--accent-dim); }
 
     .global-search-panel {
-      background: var(--surface);
-      border: 1px solid var(--border2);
+      background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 60%);
+      border: 1px solid var(--border3);
       border-radius: var(--radius);
       padding: 1rem 1.25rem;
       margin-bottom: 1.25rem;
       animation: fadeUp .2s ease both;
+      box-shadow: var(--shadow-md), inset 0 1px 0 rgba(255,255,255,0.05);
     }
 
     .global-search-row {
@@ -884,10 +1109,10 @@
       font-family: 'DM Sans', sans-serif;
       font-weight: 300;
       outline: none;
-      transition: border-color .12s;
+      transition: border-color .12s, box-shadow .12s;
     }
 
-    .global-search-inp:focus { border-color: rgba(200, 240, 96, .5); }
+    .global-search-inp:focus { border-color: rgba(200, 240, 96, .55); box-shadow: 0 0 0 3px var(--accent-glow); }
 
     .global-search-filters {
       display: flex;
@@ -896,8 +1121,8 @@
     }
 
     .gsf-btn {
-      background: transparent;
-      border: 1px solid var(--border);
+      background: var(--surface3);
+      border: 1px solid var(--border2);
       border-radius: 20px;
       padding: 5px 12px;
       font-size: 0.6875rem;
@@ -908,8 +1133,8 @@
       white-space: nowrap;
     }
 
-    .gsf-btn:hover  { border-color: var(--border2); color: var(--text2); }
-    .gsf-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+    .gsf-btn:hover  { border-color: var(--border3); color: var(--text2); }
+    .gsf-btn.active { background: var(--accent-dim); border-color: rgba(200,240,96,.5); color: var(--accent); }
 
     .global-search-results {
       display: flex;
@@ -928,15 +1153,15 @@
     }
 
     .gsr-item {
-      background: var(--surface2);
-      border: 1px solid var(--border);
+      background: var(--surface3);
+      border: 1px solid var(--border2);
       border-radius: var(--radius-sm);
       padding: 10px 14px;
       cursor: pointer;
-      transition: border-color .12s;
+      transition: border-color .12s, background .12s;
     }
 
-    .gsr-item:hover { border-color: var(--border2); }
+    .gsr-item:hover { border-color: var(--border3); background: rgba(255,255,255,0.04); }
 
     .gsr-type {
       font-size: 0.625rem;
@@ -1073,7 +1298,15 @@
     <div class="login-logo">List-a<span>Do</span></div>
     <div class="login-sub">gestor de tareas personal</div>
     <div class="login-label">Clave de acceso</div>
-    <input class="login-input" type="password" id="key-inp" placeholder="••••••••" autocomplete="current-password" />
+    <div class="login-input-wrap">
+      <input class="login-input" type="password" id="key-inp" placeholder="••••••••" autocomplete="current-password" />
+      <button class="login-eye-btn" id="eye-btn" type="button" title="Mostrar/ocultar clave">
+        <svg id="eye-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+          <circle cx="12" cy="12" r="3"/>
+        </svg>
+      </button>
+    </div>
     <div class="login-error" id="login-error">Clave incorrecta. Intentá de nuevo.</div>
     <button class="login-btn" id="login-btn">Entrar</button>
   </div>
@@ -1085,10 +1318,10 @@
     <div class="topbar-logo">List-a<span>Do</span></div>
     <div class="topbar-right">
       <div class="stats-pill">
-        <div class="stat-item">Total <span id="s-total">0</span></div>
-        <div class="stat-item">Pendientes <span id="s-pend">0</span></div>
-        <div class="stat-item soon">Por vencer <span id="s-soon">0</span></div>
-        <div class="stat-item over">Vencidas <span id="s-over">0</span></div>
+        <div class="stat-item"><span class="stat-label">Total</span><span class="stat-val" id="s-total">0</span></div>
+        <div class="stat-item"><span class="stat-label">Pendientes</span><span class="stat-val" id="s-pend">0</span></div>
+        <div class="stat-item soon"><span class="stat-label">Por vencer</span><span class="stat-val" id="s-soon">0</span></div>
+        <div class="stat-item over"><span class="stat-label">Vencidas</span><span class="stat-val" id="s-over">0</span></div>
       </div>
       <button class="logout-btn" id="logout-btn">Salir</button>
     </div>
@@ -1100,6 +1333,7 @@
         <div class="dot"></div>
         <div class="dot"></div>
         <div class="dot"></div>
+        <span class="loading-label">Cargando tareas…</span>
       </div>
     </div>
   </div>
@@ -1123,8 +1357,12 @@
     </div>
     <div class="field">
       <label class="field-label">Vencimiento (opcional)</label>
-      <input type="text" class="date-text-inp" id="f-due" placeholder="DD/MM/AAAA" maxlength="10" autocomplete="off" />
+      <div class="date-field-row">
+        <input type="text" class="date-text-inp" id="f-due" placeholder="DD/MM/AAAA" maxlength="10" autocomplete="off" />
+        <button type="button" class="cal-toggle-btn" id="cal-toggle-btn" title="Abrir calendario">📅</button>
+      </div>
       <div class="date-hint" id="due-hint"></div>
+      <div id="cal-popup-wrap"></div>
     </div>
     <div class="modal-actions">
       <button class="btn-cancel" id="task-cancel-btn">Cancelar</button>
@@ -1268,15 +1506,20 @@
     return `${m[3]}/${m[2]}/${m[1]}`;
   }
 
-  /** Parse user-typed DD/MM/YYYY → YYYY-MM-DD, or null if invalid */
+  /** Parse user-typed DD/MM/YYYY → YYYY-MM-DD, or null if invalid.
+   *  Uses a real Date object to catch impossible dates like 31/02 or 31/04. */
   function parseUserDate(str) {
     str = str.trim().replace(/[^0-9\/]/g, '');
     const m = str.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
     if (!m) return null;
-    const d = m[1].padStart(2,'0'), mo = m[2].padStart(2,'0'), y = m[3];
-    const dN = parseInt(d), moN = parseInt(mo), yN = parseInt(y);
+    const dN = parseInt(m[1]), moN = parseInt(m[2]), yN = parseInt(m[3]);
     if (moN < 1 || moN > 12 || dN < 1 || dN > 31 || yN < 2000) return null;
-    return `${y}-${mo}-${d}`;
+    // Verify the date actually exists (e.g. rejects 31/02, 31/04, etc.)
+    const check = new Date(yN, moN - 1, dN);
+    if (check.getFullYear() !== yN || check.getMonth() !== moN - 1 || check.getDate() !== dN) return null;
+    const d  = String(dN).padStart(2, '0');
+    const mo = String(moN).padStart(2, '0');
+    return `${yN}-${mo}-${d}`;
   }
 
   /** Auto-insert slashes as user types in the date field */
@@ -1375,7 +1618,7 @@
       try { listOrder = JSON.parse(lo); } catch (e) { listOrder = []; }
     }
     document.getElementById('view-container').innerHTML =
-      '<div class="loading-wrap"><div class="dot"></div><div class="dot"></div><div class="dot"></div></div>';
+      '<div class="loading-wrap"><div class="dot"></div><div class="dot"></div><div class="dot"></div><span class="loading-label">Cargando tareas…</span></div>';
     const result = await api({ action: 'getAll' });
     const cats   = result.categories;
     const tks    = result.tasks;
@@ -1533,7 +1776,7 @@
           <div class="view-actions">
             <div class="search-wrap">
               <span class="search-icon">⌕</span>
-              <input class="search-inp" type="text" id="search-inp" placeholder="Buscar..." value="${esc(listSearchQuery)}" />
+              <input class="search-inp" type="text" id="search-inp" placeholder="Buscar... (/)" title="Buscar en esta lista (/)" value="${esc(listSearchQuery)}" />
             </div>
           </div>
         </div>
@@ -1552,10 +1795,10 @@
           <div class="view-actions">
             <div class="search-wrap">
               <span class="search-icon">⌕</span>
-              <input class="search-inp" type="text" id="search-inp" placeholder="Buscar..." value="${esc(listSearchQuery)}" />
+              <input class="search-inp" type="text" id="search-inp" placeholder="Buscar... (/)" title="Buscar en esta lista (/)" value="${esc(listSearchQuery)}" />
             </div>
             <button class="icon-btn" data-action="rename-cat" title="Renombrar lista" style="opacity:1;color:var(--text3);font-size:0.875rem;padding:6px 8px;">✎</button>
-            <button class="new-task-btn" data-action="new-task">+ Nueva</button>
+            <button class="new-task-btn" data-action="new-task" title="Nueva tarea (N)">+ Nueva</button>
           </div>
         </div>
         <div class="tasks-list" id="tasks-list"></div>
@@ -1818,6 +2061,7 @@
   function closeTaskModal() {
     document.getElementById('task-modal-bg').classList.remove('open');
     editingId = null;
+    closeCalendar();
   }
 
   async function saveTask() {
@@ -1831,6 +2075,11 @@
       dueISO = parseUserDate(dueRaw);
       if (dueISO === null) { showToast('Fecha inválida. Usá DD/MM/AAAA'); return; }
     }
+
+    // Disable save button and show loading state while API call is in flight
+    const saveBtn = document.getElementById('task-save-btn');
+    if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando…'; }
+
     const currentEditingId = editingId;
     const existing  = currentEditingId ? tasks.find(t => t.id === currentEditingId) : null;
     const maxOrder  = tasks.filter(t => t.category === category).reduce((m, t) => Math.max(m, t.order||0), -1);
@@ -1844,6 +2093,17 @@
       createdAt: existing ? existing.createdAt : Date.now(),
       order:     existing ? existing.order : maxOrder + 1,
     };
+
+    const result = await api({ action: currentEditingId ? 'updateTask' : 'saveTask', task: JSON.stringify(task) });
+
+    // Re-enable button regardless of outcome (modal may already be closed by Escape, but guard anyway)
+    if (saveBtn) { saveBtn.disabled = false; saveBtn.textContent = 'Guardar'; }
+
+    if (result && result.error) {
+      showToast('Error al guardar. Revisá tu conexión.');
+      return;
+    }
+
     closeTaskModal();
     if (currentEditingId) {
       tasks = tasks.map(t => t.id === currentEditingId ? task : t);
@@ -1856,7 +2116,6 @@
     updateStats();
     renderCatBar();
     renderView();
-    api({ action: currentEditingId ? 'updateTask' : 'saveTask', task: JSON.stringify(task) });
   }
 
   function editTask(id) {
@@ -1864,30 +2123,55 @@
     if (t) openTaskModal(t);
   }
 
-  function confirmDel(id) {
-    const t    = tasks.find(x => x.id === id); if (!t) return;
-    const card = document.getElementById('tc-' + id); if (!card) return;
-    card.innerHTML = `
-      <div class="del-confirm">
-        <span>¿Eliminar "<strong>${esc(t.title)}</strong>"?</span>
-        <div class="del-actions-row">
-          <button class="del-no" data-action="del-cancel">No</button>
-          <button class="del-yes" data-action="del-confirm" data-id="${id}">Eliminar</button>
-        </div>
-      </div>`;
-  }
+  // Undo buffer for deletions — holds the last deleted task for 4 seconds
+  let _undoBuffer = null;
+  let _undoTimer  = null;
 
   async function doDelete(id) {
+    const t = tasks.find(x => x.id === id);
+    if (!t) return;
+
+    // Animate card out
     const card = document.getElementById('tc-' + id);
     if (card) { card.classList.add('anim-out'); await sleep(220); }
-    tasks = tasks.filter(t => t.id !== id);
+
+    // Remove from state
+    tasks = tasks.filter(x => x.id !== id);
     todayIds.delete(id);
     saveToday();
     updateStats();
     renderCatBar();
     renderView();
-    showToast('Tarea eliminada');
-    api({ action: 'deleteTask', id });
+
+    // Set undo buffer and show undo toast
+    _undoBuffer = { ...t };
+    if (_undoTimer) clearTimeout(_undoTimer);
+    showToastUndo(`Tarea eliminada`, () => undoDelete());
+
+    // After 4 s, commit deletion to API and clear buffer
+    _undoTimer = setTimeout(() => {
+      if (_undoBuffer && _undoBuffer.id === id) {
+        api({ action: 'deleteTask', id });
+        _undoBuffer = null;
+      }
+    }, 4000);
+  }
+
+  function undoDelete() {
+    if (!_undoBuffer) return;
+    clearTimeout(_undoTimer);
+    const t = { ..._undoBuffer };
+    _undoBuffer = null;
+    tasks.unshift(t);
+    if (t.due) {
+      const d = parseLocalDate(t.due);
+      if (d && !t.done && d < new Date()) todayIds.add(t.id);
+    }
+    saveToday();
+    updateStats();
+    renderCatBar();
+    renderView();
+    showToast('Tarea restaurada');
   }
 
   // ─── CATEGORY CRUD ─────────────────────────────────────────────────────────
@@ -1969,12 +2253,148 @@
     showToast('Lista renombrada');
   }
 
+  // ─── MINI CALENDAR ─────────────────────────────────────────────────────────
+  let calOpen      = false;
+  let calViewYear  = null;
+  let calViewMonth = null; // 0-based
+
+  const CAL_MONTHS = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  const CAL_DOWS   = ['Lu','Ma','Mi','Ju','Vi','Sa','Do'];
+
+  function openCalendar() {
+    calOpen = true;
+    const btn = document.getElementById('cal-toggle-btn');
+    if (btn) btn.classList.add('active');
+
+    // Seed view from current field value, otherwise today
+    const raw    = document.getElementById('f-due')?.value || '';
+    const parsed = parseUserDate(raw);
+    const seed   = parsed ? new Date(parsed + 'T12:00:00') : new Date();
+    calViewYear  = seed.getFullYear();
+    calViewMonth = seed.getMonth();
+
+    renderCalendar();
+  }
+
+  function closeCalendar() {
+    calOpen = false;
+    const btn = document.getElementById('cal-toggle-btn');
+    if (btn) btn.classList.remove('active');
+    const wrap = document.getElementById('cal-popup-wrap');
+    if (wrap) wrap.innerHTML = '';
+  }
+
+  function toggleCalendar() {
+    calOpen ? closeCalendar() : openCalendar();
+  }
+
+  function renderCalendar() {
+    const wrap = document.getElementById('cal-popup-wrap');
+    if (!wrap || !calOpen) return;
+
+    const today    = new Date();
+    const todayY   = today.getFullYear();
+    const todayM   = today.getMonth();
+    const todayD   = today.getDate();
+
+    // Get currently selected date from the text input
+    const raw      = document.getElementById('f-due')?.value || '';
+    const parsed   = parseUserDate(raw);
+    let selY = null, selM = null, selD = null;
+    if (parsed) {
+      const selDate = new Date(parsed + 'T12:00:00');
+      selY = selDate.getFullYear(); selM = selDate.getMonth(); selD = selDate.getDate();
+    }
+
+    // First day of month and total days
+    const firstDow = new Date(calViewYear, calViewMonth, 1).getDay(); // 0=Sun
+    // Convert to Mon-first (Mon=0 … Sun=6)
+    const startOffset = (firstDow === 0) ? 6 : firstDow - 1;
+    const daysInMonth = new Date(calViewYear, calViewMonth + 1, 0).getDate();
+
+    // Build day cells
+    let dayCells = '';
+    for (let i = 0; i < startOffset; i++) {
+      dayCells += `<div class="cal-day empty"></div>`;
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const isToday    = d === todayD && calViewMonth === todayM && calViewYear === todayY;
+      const isSelected = d === selD   && calViewMonth === selM   && calViewYear === selY;
+      const isPast     = new Date(calViewYear, calViewMonth, d) < new Date(todayY, todayM, todayD);
+      let cls = 'cal-day';
+      if (isToday)    cls += ' today-marker';
+      if (isSelected) cls += ' selected';
+      if (isPast)     cls += ' past';
+      dayCells += `<div class="${cls}" data-cal-day="${d}">${d}</div>`;
+    }
+
+    wrap.innerHTML = `
+      <div class="cal-popup" id="cal-popup">
+        <div class="cal-nav">
+          <button class="cal-nav-btn" id="cal-prev">‹</button>
+          <span class="cal-month-label">${CAL_MONTHS[calViewMonth]} ${calViewYear}</span>
+          <button class="cal-nav-btn" id="cal-next">›</button>
+        </div>
+        <div class="cal-grid">
+          ${CAL_DOWS.map(d => `<div class="cal-dow">${d}</div>`).join('')}
+          ${dayCells}
+        </div>
+      </div>`;
+
+    document.getElementById('cal-prev').addEventListener('click', e => {
+      e.stopPropagation();
+      calViewMonth--;
+      if (calViewMonth < 0) { calViewMonth = 11; calViewYear--; }
+      renderCalendar();
+    });
+
+    document.getElementById('cal-next').addEventListener('click', e => {
+      e.stopPropagation();
+      calViewMonth++;
+      if (calViewMonth > 11) { calViewMonth = 0; calViewYear++; }
+      renderCalendar();
+    });
+
+    wrap.querySelectorAll('.cal-day[data-cal-day]').forEach(cell => {
+      cell.addEventListener('click', e => {
+        e.stopPropagation();
+        const d  = parseInt(cell.dataset.calDay);
+        const mo = String(calViewMonth + 1).padStart(2, '0');
+        const dd = String(d).padStart(2, '0');
+        const displayVal = `${dd}/${mo}/${calViewYear}`;
+        const inp = document.getElementById('f-due');
+        if (inp) {
+          inp.value = displayVal;
+          onDueInput(inp);
+        }
+        closeCalendar();
+      });
+    });
+  }
+
   // ─── TOAST ─────────────────────────────────────────────────────────────────
+  let _toastTimer = null;
+
   function showToast(msg) {
-    const t = document.getElementById('toast');
-    t.textContent = msg;
-    t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2200);
+    const el = document.getElementById('toast');
+    el.innerHTML = `<span>${esc(msg)}</span>`;
+    el.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), 2200);
+  }
+
+  /** Shows a toast with an "Deshacer" button. onUndo is called if user taps it. */
+  function showToastUndo(msg, onUndo) {
+    const el = document.getElementById('toast');
+    el.innerHTML = `<span>${esc(msg)}</span><button class="toast-undo-btn" id="toast-undo-btn">Deshacer</button>`;
+    el.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    document.getElementById('toast-undo-btn').addEventListener('click', () => {
+      el.classList.remove('show');
+      clearTimeout(_toastTimer);
+      onUndo();
+    });
+    _toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
   }
 
   // ─── GLOBAL SEARCH ─────────────────────────────────────────────────────────
@@ -2128,9 +2548,7 @@
     if (action === 'add-today')   { addToday(id); return; }
     if (action === 'rm-today')    { removeToday(id); return; }
     if (action === 'edit')        { editTask(id); return; }
-    if (action === 'del')         { confirmDel(id); return; }
-    if (action === 'del-confirm') { doDelete(id); return; }
-    if (action === 'del-cancel')  { renderView(); return; }
+    if (action === 'del')         { doDelete(id); return; }  // direct delete with undo toast
 
     // Modal backdrop clicks
     if (t.id === 'task-modal-bg')       { closeTaskModal(); return; }
@@ -2140,6 +2558,19 @@
 
   // ─── STATIC EVENT LISTENERS ────────────────────────────────────────────────
   document.getElementById('login-btn').addEventListener('click', doLogin);
+
+  document.getElementById('eye-btn').addEventListener('click', () => {
+    const inp  = document.getElementById('key-inp');
+    const icon = document.getElementById('eye-icon');
+    const show = inp.type === 'password';
+    inp.type   = show ? 'text' : 'password';
+    icon.innerHTML = show
+      ? `<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/>
+         <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/>
+         <line x1="1" y1="1" x2="23" y2="23"/>`
+      : `<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/>
+         <circle cx="12" cy="12" r="3"/>`;
+  });
   document.getElementById('logout-btn').addEventListener('click', doLogout);
   document.getElementById('task-cancel-btn').addEventListener('click', closeTaskModal);
   document.getElementById('task-save-btn').addEventListener('click', saveTask);
@@ -2151,6 +2582,21 @@
   // Date input formatting
   document.getElementById('f-due').addEventListener('input', e => onDueInput(e.target));
 
+  // Calendar toggle
+  document.addEventListener('click', e => {
+    const toggleBtn = e.target.closest('#cal-toggle-btn');
+    if (toggleBtn) { toggleCalendar(); return; }
+    // Close calendar if clicking outside the popup and outside the toggle btn
+    if (calOpen && !e.target.closest('#cal-popup') && !e.target.closest('#cal-toggle-btn')) {
+      closeCalendar();
+    }
+  }, true); // capture phase so it fires before other handlers
+
+  // Enter on title field → save task (consistent with other modals)
+  document.getElementById('f-title').addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); saveTask(); }
+  });
+
   // Modal backdrop clicks
   document.getElementById('task-modal-bg').addEventListener('click',       e => { if (e.target.id === 'task-modal-bg') closeTaskModal(); });
   document.getElementById('cat-modal-bg').addEventListener('click',        e => { if (e.target.id === 'cat-modal-bg') closeCatModal(); });
@@ -2158,11 +2604,38 @@
 
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
+    // Escape closes any open modal or global search
     if (e.key === 'Escape') {
       closeTaskModal();
       closeCatModal();
       closeRenameCatModal();
       if (globalSearchOpen) toggleGlobalSearch();
+      return;
+    }
+
+    // Ctrl+K → toggle global search (works even from inside inputs)
+    if (e.ctrlKey && e.key === 'k') {
+      e.preventDefault();
+      toggleGlobalSearch();
+      return;
+    }
+
+    // Skip shortcuts when typing inside an input, textarea or select
+    const activeTag = document.activeElement?.tagName;
+    if (activeTag === 'INPUT' || activeTag === 'TEXTAREA' || activeTag === 'SELECT') return;
+
+    // N → new task (works in any view)
+    if (e.key === 'n' || e.key === 'N') {
+      e.preventDefault();
+      openTaskModal();
+      return;
+    }
+
+    // / → focus the current list search input
+    if (e.key === '/') {
+      e.preventDefault();
+      const searchInp = document.getElementById('search-inp');
+      if (searchInp) searchInp.focus();
     }
   });
 
