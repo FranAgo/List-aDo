@@ -772,14 +772,61 @@
       background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 55%);
       border: 1px solid var(--border3);
       border-radius: var(--radius);
-      padding: 1.75rem;
       width: 100%;
       max-width: 460px;
       max-height: 90vh;
-      overflow-y: auto;
+      overflow: hidden; /* clips scrollbar to border-radius */
       transform: translateY(20px);
       transition: transform .22s cubic-bezier(.34, 1.28, .64, 1);
       box-shadow: var(--shadow-lg), inset 0 1px 0 rgba(255,255,255,0.07);
+    }
+
+    /* Inner scroll wrapper — keeps scrollbar inside rounded corners */
+    .modal-inner {
+      padding: 1.75rem;
+      max-height: 90vh;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(200, 240, 96, 0.2) transparent;
+    }
+
+    /* Custom scrollbar — Webkit (Chrome, Safari, Edge)
+       Técnica: box-shadow en el thumb + border transparente para inset lateral.
+       El gap vertical se logra con border-top/bottom en el THUMB (no en el track),
+       que sí es respetado por WebKit cuando se combina con background-clip. */
+    .modal-inner::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .modal-inner::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .modal-inner::-webkit-scrollbar-thumb {
+      /* box-shadow reemplaza background — no se ve afectado por background-clip */
+      background: transparent;
+      box-shadow: inset 0 0 0 4px rgba(200, 240, 96, 0.2);
+      border-radius: 99px;
+      /* border transparente crea el gap lateral Y vertical */
+      border: 2px solid transparent;
+      border-top: 10px solid transparent;
+      border-bottom: 10px solid transparent;
+    }
+
+    .modal-inner:hover::-webkit-scrollbar-thumb {
+      box-shadow: inset 0 0 0 4px rgba(200, 240, 96, 0.45);
+      border: 2px solid transparent;
+      border-top: 10px solid transparent;
+      border-bottom: 10px solid transparent;
+      border-radius: 99px;
+    }
+
+    .modal-inner::-webkit-scrollbar-thumb:active {
+      box-shadow: inset 0 0 0 4px rgba(200, 240, 96, 0.7);
+      border: 2px solid transparent;
+      border-top: 10px solid transparent;
+      border-bottom: 10px solid transparent;
+      border-radius: 99px;
     }
 
     .modal-bg.open .modal { transform: translateY(0); }
@@ -805,8 +852,7 @@
     }
 
     .field input,
-    .field textarea,
-    .field select {
+    .field textarea {
       width: 100%;
       background: var(--bg);
       border: 1px solid var(--border2);
@@ -821,12 +867,35 @@
       resize: vertical;
     }
 
+    /* Select — standalone block to avoid background shorthand conflict */
+    .field select {
+      width: 100%;
+      background-color: var(--bg);
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8784' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 10px center;
+      background-size: 16px 16px;
+      border: 1px solid var(--border2);
+      border-radius: var(--radius-sm);
+      padding: 10px 36px 10px 12px;
+      font-size: 0.875rem;
+      color: var(--text);
+      font-family: 'DM Sans', sans-serif;
+      font-weight: 300;
+      outline: none;
+      transition: border-color .12s, box-shadow .12s;
+      appearance: none;
+      -webkit-appearance: none;
+      cursor: pointer;
+    }
+
+    .field select option { background: var(--surface2); }
+
     .field input:focus,
     .field textarea:focus,
     .field select:focus { border-color: rgba(200, 240, 96, .55); box-shadow: 0 0 0 3px var(--accent-glow); }
 
     .field input[type="date"] { color-scheme: dark; }
-    .field select option       { background: var(--surface2); }
 
     .modal-actions {
       display: flex;
@@ -1315,7 +1384,7 @@
       .task-actions { opacity: 1; }
 
       /* Modal */
-      .modal         { padding: 1.25rem; }
+      .modal-inner   { padding: 1.25rem; }
       .modal-actions { flex-direction: column-reverse; }
       .btn-cancel,
       .btn-save      { width: 100%; text-align: center; padding: 11px; }
@@ -1384,6 +1453,7 @@
 <!-- ─── MODAL: TASK ──────────────────────────────────────────────────────────── -->
 <div class="modal-bg" id="task-modal-bg">
   <div class="modal">
+    <div class="modal-inner">
     <div class="modal-title" id="task-modal-title">Nueva tarea</div>
     <div class="field">
       <label class="field-label">Título</label>
@@ -1410,12 +1480,14 @@
       <button class="btn-cancel" id="task-cancel-btn">Cancelar</button>
       <button class="btn-save" id="task-save-btn">Guardar</button>
     </div>
+    </div>
   </div>
 </div>
 
 <!-- ─── MODAL: NUEVA LISTA ───────────────────────────────────────────────────── -->
 <div class="modal-bg" id="cat-modal-bg">
   <div class="modal" style="max-width:360px">
+    <div class="modal-inner">
     <div class="modal-title">Nueva lista</div>
     <div class="field">
       <label class="field-label">Nombre</label>
@@ -1425,12 +1497,14 @@
       <button class="btn-cancel" id="cat-cancel-btn">Cancelar</button>
       <button class="btn-save" id="cat-save-btn">Crear lista</button>
     </div>
+    </div>
   </div>
 </div>
 
 <!-- ─── MODAL: RENOMBRAR LISTA ───────────────────────────────────────────────── -->
 <div class="modal-bg" id="rename-cat-modal-bg">
   <div class="modal" style="max-width:360px">
+    <div class="modal-inner">
     <div class="modal-title">Renombrar lista</div>
     <div class="field">
       <label class="field-label">Nuevo nombre</label>
@@ -1439,6 +1513,7 @@
     <div class="modal-actions">
       <button class="btn-cancel" id="rename-cat-cancel-btn">Cancelar</button>
       <button class="btn-save" id="rename-cat-save-btn">Guardar</button>
+    </div>
     </div>
   </div>
 </div>
