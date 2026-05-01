@@ -4,6 +4,14 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>List-aDo</title>
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#0b0b0c" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="List-aDo" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzAwMDAwMCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI3MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsIFRpbWVzIE5ldyBSb21hbiwgc2VyaWYiIGZvbnQtc2l6ZT0iNTgiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNENEZGNUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkw8L3RleHQ+Cjwvc3ZnPg==" />
+  <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzAwMDAwMCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI3MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsIFRpbWVzIE5ldyBSb21hbiwgc2VyaWYiIGZvbnQtc2l6ZT0iNTgiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNENEZGNUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkw8L3RleHQ+Cjwvc3ZnPg==" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
     href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap"
@@ -708,6 +716,23 @@
       font-family: 'DM Mono', monospace;
     }
 
+    .del-done-btn {
+      background: transparent;
+      border: 1px solid rgba(180, 180, 180, .25);
+      border-radius: var(--radius-sm);
+      padding: 7px 14px;
+      font-size: 0.75rem;
+      color: var(--text3);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      transition: all .12s;
+      margin-bottom: 8px;
+      display: block;
+      animation: fadeUp .2s cubic-bezier(.25, .8, .25, 1) both;
+    }
+
+    .del-done-btn:hover { background: rgba(180, 180, 180, .08); color: var(--text2); }
+
     /* ─── EMPTY STATE ────────────────────────────────────────────────────────── */
     .empty {
       text-align: center;
@@ -1061,6 +1086,23 @@
     }
 
     .toast-undo-btn:hover { background: var(--accent-dim); border-color: rgba(200,240,96,.4); }
+
+    /* Confirm button inside toast (used for destructive confirmations) */
+    .toast-confirm-btn {
+      background: transparent;
+      border: 1px solid rgba(255, 95, 95, .35);
+      border-radius: 12px;
+      padding: 3px 10px;
+      font-size: 0.6875rem;
+      color: var(--red);
+      cursor: pointer;
+      font-family: 'DM Mono', monospace;
+      letter-spacing: .04em;
+      transition: background .12s, border-color .12s;
+      flex-shrink: 0;
+    }
+
+    .toast-confirm-btn:hover { background: var(--red-dim); border-color: rgba(255,95,95,.5); }
 
     /* ─── GLOBAL SEARCH ──────────────────────────────────────────────────────── */
     .global-search-btn {
@@ -1803,6 +1845,9 @@
         </div>
         <div class="tasks-list" id="tasks-list"></div>
         <div class="del-cat-zone">
+          ${tasks.some(t => t.category === currentCat && t.done) && !listSearchQuery.trim()
+            ? `<button class="del-done-btn" data-action="del-done">Eliminar tareas completadas</button>`
+            : ''}
           <button class="del-cat-btn" data-action="del-cat" ${hasPending ? 'disabled' : ''}>Eliminar lista "${esc(currentCat)}"</button>
           ${hasPending ? '<p class="del-cat-note">Eliminá todas las tareas pendientes para poder borrar esta lista.</p>' : ''}
         </div>`;
@@ -2201,23 +2246,46 @@
     api({ action: 'saveCategory', name });
   }
 
+  function deleteCompletedTasks(cat) {
+    const completed = tasks.filter(t => t.category === cat && t.done);
+    if (!completed.length) return;
+    showToastConfirm(
+      `¿Eliminar ${completed.length} tarea${completed.length > 1 ? 's' : ''} completada${completed.length > 1 ? 's' : ''}?`,
+      () => {
+        // Animate cards out before removing them from the DOM
+        const cards = completed.map(t => document.getElementById(`tc-${t.id}`)).filter(Boolean);
+        const ANIM_DURATION = 280;
+        cards.forEach(card => {
+          card.style.animation = `taskOut ${ANIM_DURATION}ms cubic-bezier(.25, .8, .25, 1) forwards`;
+        });
+        setTimeout(() => {
+          tasks = tasks.filter(t => !(t.category === cat && t.done));
+          renderView();
+          completed.forEach(t => api({ action: 'deleteTask', id: t.id }));
+          showToast(`${completed.length} tarea${completed.length > 1 ? 's' : ''} eliminada${completed.length > 1 ? 's' : ''}`);
+        }, ANIM_DURATION);
+      }
+    );
+  }
+
   function confirmDelCat(cat) {
     if (tasks.some(t => t.category === cat && !t.done)) {
       showToast('Eliminá las tareas pendientes primero');
       return;
     }
-    if (!confirm(`¿Eliminar la lista "${cat}"? Las tareas completadas también se eliminarán.`)) return;
-    const toDelete = tasks.filter(t => t.category === cat);
-    tasks      = tasks.filter(t => t.category !== cat);
-    categories = categories.filter(c => c !== cat);
-    listOrder  = listOrder.filter(c => c !== cat);
-    localStorage.setItem(LORDER_KEY, JSON.stringify(listOrder));
-    currentCat = 'today';
-    renderCatBar();
-    renderView();
-    showToast('Lista eliminada');
-    api({ action: 'deleteCategory', name: cat });
-    toDelete.forEach(t => api({ action: 'deleteTask', id: t.id }));
+    showToastConfirm(`¿Eliminar la lista "${cat}"?`, () => {
+      const toDelete = tasks.filter(t => t.category === cat);
+      tasks      = tasks.filter(t => t.category !== cat);
+      categories = categories.filter(c => c !== cat);
+      listOrder  = listOrder.filter(c => c !== cat);
+      localStorage.setItem(LORDER_KEY, JSON.stringify(listOrder));
+      currentCat = 'today';
+      renderCatBar();
+      renderView();
+      showToast('Lista eliminada');
+      api({ action: 'deleteCategory', name: cat });
+      toDelete.forEach(t => api({ action: 'deleteTask', id: t.id }));
+    });
   }
 
   function openRenameCatModal(cat) {
@@ -2375,7 +2443,22 @@
   // ─── TOAST ─────────────────────────────────────────────────────────────────
   let _toastTimer = null;
 
+  /**
+   * If a delete-with-undo is pending and a new toast is about to replace it,
+   * commit the deletion to the API immediately so it isn't lost.
+   * Must be called before clearing _toastTimer in any showToast* function.
+   */
+  function commitPendingUndo() {
+    if (_undoBuffer) {
+      clearTimeout(_undoTimer);
+      api({ action: 'deleteTask', id: _undoBuffer.id });
+      _undoBuffer = null;
+      _undoTimer  = null;
+    }
+  }
+
   function showToast(msg) {
+    commitPendingUndo();
     const el = document.getElementById('toast');
     el.innerHTML = `<span>${esc(msg)}</span>`;
     el.classList.add('show');
@@ -2385,6 +2468,7 @@
 
   /** Shows a toast with an "Deshacer" button. onUndo is called if user taps it. */
   function showToastUndo(msg, onUndo) {
+    commitPendingUndo();
     const el = document.getElementById('toast');
     el.innerHTML = `<span>${esc(msg)}</span><button class="toast-undo-btn" id="toast-undo-btn">Deshacer</button>`;
     el.classList.add('show');
@@ -2394,6 +2478,22 @@
       clearTimeout(_toastTimer);
       onUndo();
     });
+    _toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
+  }
+
+  /** Shows a toast with a "Confirmar" button for destructive actions. onConfirm is called if user taps it. */
+  function showToastConfirm(msg, onConfirm) {
+    commitPendingUndo();
+    const el = document.getElementById('toast');
+    el.innerHTML = `<span>${esc(msg)}</span><button class="toast-confirm-btn" id="toast-confirm-btn">Confirmar</button>`;
+    el.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    document.getElementById('toast-confirm-btn').addEventListener('click', () => {
+      el.classList.remove('show');
+      clearTimeout(_toastTimer);
+      onConfirm();
+    });
+    // Auto-dismiss after 4s without action = cancelled
     _toastTimer = setTimeout(() => el.classList.remove('show'), 4000);
   }
 
@@ -2544,6 +2644,7 @@
     if (action === 'new-task')    { openTaskModal(); return; }
     if (action === 'rename-cat')  { openRenameCatModal(currentCat); return; }
     if (action === 'del-cat')     { confirmDelCat(currentCat); return; }
+    if (action === 'del-done')    { deleteCompletedTasks(currentCat); return; }
     if (action === 'toggle-done') { toggleDone(id, t.dataset.viewcat); return; }
     if (action === 'add-today')   { addToday(id); return; }
     if (action === 'rm-today')    { removeToday(id); return; }
