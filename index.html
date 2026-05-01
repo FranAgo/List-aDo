@@ -12,6 +12,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzAwMDAwMCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI3MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsIFRpbWVzIE5ldyBSb21hbiwgc2VyaWYiIGZvbnQtc2l6ZT0iNTgiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNENEZGNUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkw8L3RleHQ+Cjwvc3ZnPg==" />
   <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzAwMDAwMCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI3MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsIFRpbWVzIE5ldyBSb21hbiwgc2VyaWYiIGZvbnQtc2l6ZT0iNTgiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNENEZGNUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkw8L3RleHQ+Cjwvc3ZnPg==" />
+  <!-- GSAP — animación del liquid glass indicator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
     href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap"
@@ -1304,7 +1307,113 @@
       padding: 0 1px;
     }
 
-    /* ─── ANIMATIONS ─────────────────────────────────────────────────────────── */
+    /* ─── LIQUID GLASS INDICATOR ─────────────────────────────────────────────── */
+
+    /* SVG filter oculto — define la distorsión óptica del glass */
+    .lg-filter-host {
+      position: absolute;
+      width: 0;
+      height: 0;
+      overflow: hidden;
+      pointer-events: none;
+    }
+
+    /*
+      Indicador flotante que viaja entre listas.
+      Posicionado en absolute sobre .cat-bar (que pasa a relative).
+      z-index por debajo de los botones para no bloquear clicks.
+    */
+    #lg-indicator {
+      position: fixed;
+      top: 0;
+      left: 0;
+      height: 0;
+      width: 0;
+      border-radius: 20px;
+      pointer-events: none;
+      z-index: 9;
+      opacity: 0;
+      will-change: transform, width, height, top, left;
+
+      /* Fondo visible sobre dark — tinte blanco semi-transparente */
+      background: rgba(255, 255, 255, 0.11);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.22),
+        inset 0 -1px 0 rgba(0, 0, 0, 0.15),
+        0 2px 12px rgba(0, 0, 0, 0.4),
+        0 0 0 1px rgba(255, 255, 255, 0.06);
+
+      overflow: hidden;
+    }
+
+    /* Specular highlight — franja de luz interna */
+    #lg-indicator::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 10%;
+      width: 80%;
+      height: 40%;
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.14) 0%,
+        transparent 100%
+      );
+      border-radius: 0 0 50% 50%;
+      pointer-events: none;
+    }
+
+    /* Capa de distorsión — backdrop-filter + SVG filter */
+    #lg-distortion {
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      /* backdrop-filter aplica el blur base y el SVG de distorsión */
+      backdrop-filter: blur(8px) url(#lg-glass-filter);
+      -webkit-backdrop-filter: blur(8px) url(#lg-glass-filter);
+      pointer-events: none;
+    }
+
+    /* Fallback: si backdrop-filter no soporta url(), mantenemos el blur simple */
+    @supports not (backdrop-filter: url(#x)) {
+      #lg-distortion {
+        backdrop-filter: blur(10px) saturate(1.4);
+        -webkit-backdrop-filter: blur(10px) saturate(1.4);
+        background: rgba(255, 255, 255, 0.05);
+      }
+    }
+
+    /* Los botones necesitan z-index mayor que el indicador fixed */
+    .cat-bar .cat-btn,
+    .cat-bar .new-cat-btn,
+    .cat-bar .global-search-btn {
+      position: relative;
+      z-index: 10;
+    }
+
+    /* Cuando hay glass activo, limpiar fondo y glow de todos los botones activos.
+       El color de texto se preserva — viene del inline style en los botones de lista,
+       y del color de accent para "Tareas de hoy" (que mantiene su color original). */
+    .cat-bar.lg-active .cat-btn.active {
+      background: transparent !important;
+      box-shadow: none !important;
+    }
+
+    /* Para "Tareas de hoy" específicamente, restaurar el color de texto original
+       ya que .cat-btn.active lo sobreescribe a --accent-text (negro) */
+    .cat-bar.lg-active .cat-btn.active[data-cat-action="today"] {
+      color: var(--accent) !important;
+    }
+
+    /* Reduced motion — el indicador salta directo, sin animación */
+    @media (prefers-reduced-motion: reduce) {
+      #lg-indicator {
+        transition: none !important;
+      }
+    }
+
+
     @keyframes fadeUp {
       from { opacity: 0; transform: translateY(14px); }
       to   { opacity: 1; transform: translateY(0); }
@@ -1403,6 +1512,35 @@
 </head>
 <body>
 
+<!-- ─── LIQUID GLASS — SVG FILTER (inline, referenciado por id) ─────────────── -->
+<!--
+  feGaussianBlur: desenfoca ligeramente la imagen del source para suavizar la distorsión.
+  feTurbulence:   genera un campo de ruido orgánico (la "textura" del vidrio).
+  feDisplacementMap: usa ese ruido para desplazar píxeles del backdrop → distorsión óptica real.
+  feComposite:    recorta el resultado al shape del elemento (evita overflow de distorsión).
+-->
+<svg class="lg-filter-host" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="lg-glass-filter" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feTurbulence
+        type="fractalNoise"
+        baseFrequency="0.65 0.75"
+        numOctaves="3"
+        seed="2"
+        result="noise"
+      />
+      <feDisplacementMap
+        in="SourceGraphic"
+        in2="noise"
+        scale="6"
+        xChannelSelector="R"
+        yChannelSelector="G"
+        result="displaced"
+      />
+    </filter>
+  </defs>
+</svg>
+
 <!-- ─── LOGIN SCREEN ────────────────────────────────────────────────────────── -->
 <div id="login-screen">
   <div class="login-card">
@@ -1439,6 +1577,10 @@
   </div>
   <div class="main">
     <div class="cat-bar" id="cat-bar"></div>
+    <!-- Liquid glass indicator — fuera de cat-bar para que renderCatBar no lo destruya -->
+    <div id="lg-indicator" aria-hidden="true">
+      <div id="lg-distortion"></div>
+    </div>
     <div id="view-container">
       <div class="loading-wrap">
         <div class="dot"></div>
@@ -1727,6 +1869,11 @@
 
   // ─── INIT ──────────────────────────────────────────────────────────────────
   async function init() {
+    // Fix #4 (Duck): resetear estado del glass indicator en cada init,
+    // por si el usuario hizo logout + login sin recargar la pestaña.
+    lgInitDone   = false;
+    lgCurrentBtn = null;
+
     loadCatColors();
     const st = localStorage.getItem(TKEY);
     if (st) todayIds = new Set(JSON.parse(st));
@@ -1751,6 +1898,8 @@
     updateStats();
     renderCatBar();
     renderView();
+    // Fix #2 (Duck): arrancar el observer de resize una vez que el DOM está listo
+    lgStartObserving();
   }
 
   function syncListOrder() {
@@ -1806,11 +1955,14 @@
       const n      = tasks.filter(t => t.category===c && !t.done && !todayIds.has(t.id)).length;
       const col    = getCatColor(c);
       const isActive = currentCat === c;
+      // Cuando está activo, NO aplicamos background inline — el glass indicator
+      // lo reemplaza visualmente. Solo conservamos color de texto y borde.
+      // Agregamos clase 'active' para que lgSyncWithActiveBtn pueda encontrarlo.
       const style  = isActive
-        ? `background:${col.bg};border-color:${col.border};color:${col.text};font-weight:500;`
+        ? `border-color:${col.border};color:${col.text};font-weight:500;`
         : `border-color:${col.border};color:${col.text};`;
       const dragOver = catDragOverIdx === i ? 'border-left:3px solid var(--accent);' : '';
-      h += `<button class="cat-btn" style="${style}${dragOver}" draggable="true" data-cat="${esc(c)}" data-idx="${i}">${esc(c)} <span class="cat-count">${n}</span></button>`;
+      h += `<button class="cat-btn ${isActive ? 'active' : ''}" style="${style}${dragOver}" draggable="true" data-cat="${esc(c)}" data-idx="${i}">${esc(c)} <span class="cat-count">${n}</span></button>`;
     });
     h += `<button class="new-cat-btn" data-cat-action="new">+ Lista</button>`;
     h += `<button class="global-search-btn" id="global-search-toggle" title="Búsqueda global">⌕</button>`;
@@ -1823,11 +1975,21 @@
         e.dataTransfer.effectAllowed = 'move';
         e.dataTransfer.setData('text/plain', catDragIdx);
         btn.style.opacity = '0.4';
+
+        // Fix #3 (Duck): matar animación GSAP en curso antes del drag.
+        // renderCatBar() destruye y recrea los nodos del cat-bar, así que
+        // cualquier tween activo sobre lg-indicator quedaría apuntando a
+        // posiciones de botones que ya no existen en el DOM.
+        if (typeof gsap !== 'undefined') gsap.killTweensOf(lgIndicator);
+        lgInitDone   = false;
+        lgCurrentBtn = null;
       });
       btn.addEventListener('dragend', () => {
         btn.style.opacity = '';
-        catDragIdx = null;
+        catDragIdx     = null;
         catDragOverIdx = null;
+        // lgInitDone ya es false desde dragstart — renderCatBar llamará
+        // lgSyncWithActiveBtn vía rAF, que posicionará sin animación.
         renderCatBar();
       });
       btn.addEventListener('dragover', e => {
@@ -1859,6 +2021,11 @@
         renderCatBar();
       });
     });
+
+    // Sincronizar liquid glass indicator con el botón activo.
+    // Doble rAF: el primero permite que el browser procese el nuevo DOM,
+    // el segundo espera a que el layout (flexbox, fuentes) esté resuelto.
+    requestAnimationFrame(() => requestAnimationFrame(lgSyncWithActiveBtn));
   }
 
   /** Lightweight visual update during drag — only updates border styles */
@@ -2825,12 +2992,211 @@
     if (e.key === 'Enter') { saveRenameCategory(); e.preventDefault(); }
   });
 
+  // ─── LIQUID GLASS INDICATOR ────────────────────────────────────────────────
+  //
+  // El indicador es un div absoluto dentro de .cat-bar que viaja entre botones.
+  // Usa GSAP para la animación en 3 fases: expand → translate → settle.
+  // La distorsión óptica la provee el SVG filter + backdrop-filter en CSS.
+  // Usa GSAP para la animación en 3 fases: expand → translate → settle.
+  // La distorsión óptica la provee el SVG filter + backdrop-filter en CSS.
+
+  const lgIndicator = document.getElementById('lg-indicator');
+  let lgCurrentBtn  = null;   // botón activo anterior (para comparar)
+  let lgInitDone    = false;  // primer posicionamiento sin animación
+
+  /**
+   * Obtiene posición y dimensiones de un botón relativas al viewport.
+   * Usamos fixed positioning ahora que el indicador está fuera del cat-bar.
+   */
+  function lgGetBtnRect(btn) {
+    const r = btn.getBoundingClientRect();
+    return {
+      left:   Math.round(r.left),
+      top:    Math.round(r.top),
+      width:  Math.round(r.width),
+      height: Math.round(r.height),
+    };
+  }
+
+  /**
+   * Posiciona el indicador sobre el botón activo.
+   * Si es la primera vez, salta directo (sin animación).
+   * Si ya había uno activo, ejecuta la secuencia expand → translate → settle.
+   */
+  function lgMoveTo(activeBtn) {
+    if (!lgIndicator || !activeBtn) return;
+    // Guard: si GSAP no cargó (CDN fallido), no intentar usarlo
+    if (typeof gsap === 'undefined') return;
+
+    // Detectar preferencia de movimiento reducido
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    const rect = lgGetBtnRect(activeBtn);
+    const catBar = document.getElementById('cat-bar');
+
+    // Primera vez: posicionar sin animación y mostrar
+    if (!lgInitDone) {
+      gsap.set(lgIndicator, {
+        left:    rect.left,
+        top:     rect.top,
+        width:   rect.width,
+        height:  rect.height,
+        opacity: 1,
+      });
+      catBar.classList.add('lg-active');
+      lgIndicator.style.opacity = '1';
+      lgCurrentBtn = activeBtn;
+      lgInitDone   = true;
+      return;
+    }
+
+    // Si el destino es el mismo botón, no hacer nada
+    if (lgCurrentBtn === activeBtn) return;
+
+    // Reduced motion: salto directo
+    if (prefersReduced) {
+      gsap.set(lgIndicator, {
+        left:   rect.left,
+        top:    rect.top,
+        width:  rect.width,
+        height: rect.height,
+      });
+      lgCurrentBtn = activeBtn;
+      return;
+    }
+
+    // Matar animaciones previas si el usuario clickeó muy rápido
+    gsap.killTweensOf(lgIndicator);
+
+    lgCurrentBtn = activeBtn;
+
+    // ── FASE 1: Expand (el glass "respira" antes de moverse) ──────────────────
+    // ── FASE 2: Translate (viaja al destino, con scale volviendo a 1) ─────────
+    // ── FASE 3: Settle (pequeño bounce al aterrizar) ──────────────────────────
+    const tl = gsap.timeline();
+
+    tl.to(lgIndicator, {
+      scaleX:   1.12,
+      scaleY:   1.18,
+      duration: 0.13,
+      ease:     'power2.out',
+    });
+
+    tl.to(lgIndicator, {
+      left:     rect.left,
+      top:      rect.top,
+      width:    rect.width,
+      height:   rect.height,
+      scaleX:   1,
+      scaleY:   1,
+      duration: 0.32,
+      ease:     'power3.inOut',
+    });
+
+    // Settle: leve bounce en Y para sensación de aterrizaje físico
+    tl.to(lgIndicator, {
+      scaleY:   1.04,
+      duration: 0.08,
+      ease:     'power1.out',
+    });
+
+    tl.to(lgIndicator, {
+      scaleY:   1,
+      duration: 0.18,
+      ease:     'elastic.out(1, 0.5)',
+    });
+  }
+
+  /**
+   * Busca el botón activo en cat-bar y mueve el indicador.
+   * Se llama cada vez que renderCatBar() termina.
+   */
+  function lgSyncWithActiveBtn() {
+    // Si no hay GSAP disponible (raro pero posible), salir silencioso
+    if (typeof gsap === 'undefined') return;
+
+    const catBar = document.getElementById('cat-bar');
+    if (!catBar) return;
+
+    // Buscar el botón con .active (el de "Tareas de hoy" o cualquier lista)
+    const activeBtn = catBar.querySelector('.cat-btn.active');
+
+    if (!activeBtn) {
+      // No hay activo: ocultar indicador
+      gsap.to(lgIndicator, { opacity: 0, duration: 0.15 });
+      catBar.classList.remove('lg-active');
+      lgCurrentBtn = null;
+      lgInitDone   = false;
+      return;
+    }
+
+    catBar.classList.add('lg-active');
+    lgMoveTo(activeBtn);
+  }
+
+  /**
+   * Fix #2 (Duck): reposicionar el indicador si el layout cambia.
+   * Cubre: resize de ventana, rotación en mobile, cambio de zoom,
+   * y cualquier reflow que mueva los botones de fila (flex-wrap).
+   *
+   * Usamos ResizeObserver sobre #cat-bar en lugar de window 'resize'
+   * porque captura también cambios internos del contenedor (ej: nueva lista
+   * que hace que la barra wrappee a una segunda fila).
+   *
+   * Al detectar un cambio: reseteamos lgInitDone para que el próximo sync
+   * posicione sin animación (no queremos que el glass "viaje" al hacer resize).
+   */
+  const lgResizeObserver = new ResizeObserver(() => {
+    // Solo actuar si la app está visible y hay un indicador posicionado
+    if (!lgInitDone) return;
+    lgInitDone = false;         // próximo sync posiciona sin animación
+    lgSyncWithActiveBtn();
+  });
+
+  // Empezar a observar cuando la app arranque (llamado desde init())
+  function lgStartObserving() {
+    const catBar = document.getElementById('cat-bar');
+    if (catBar) lgResizeObserver.observe(catBar);
+
+    // Re-sincronizar cuando las fuentes terminen de cargar —
+    // DM Sans cambia el ancho de los botones y desplaza el indicador
+    if (document.fonts && document.fonts.ready) {
+      document.fonts.ready.then(() => {
+        lgInitDone = false;
+        lgSyncWithActiveBtn();
+      });
+    }
+  }
+
   // ─── BOOT ──────────────────────────────────────────────────────────────────
-  const saved = localStorage.getItem(LKEY);
-  if (saved === SECRET) {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('app-screen').classList.add('visible');
-    init();
+  //
+  // Fix #1 (Duck): si GSAP todavía no cargó cuando se ejecuta el boot
+  // (puede pasar con sesión guardada + CDN lento), esperamos al evento
+  // 'load' del script antes de intentar usar gsap por primera vez.
+  // lgSyncWithActiveBtn ya tiene un guard interno, pero esto garantiza
+  // que el indicador aparezca aunque GSAP llegue tarde.
+
+  function bootApp() {
+    const saved = localStorage.getItem(LKEY);
+    if (saved === SECRET) {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').classList.add('visible');
+      init();
+    }
+  }
+
+  const gsapScript = document.querySelector('script[src*="gsap"]');
+  if (typeof gsap !== 'undefined') {
+    // GSAP ya está disponible (caso normal — script bloqueante ya ejecutó)
+    bootApp();
+  } else if (gsapScript) {
+    // GSAP todavía cargando — esperamos su evento load
+    gsapScript.addEventListener('load', bootApp);
+    // Fallback: si el script falla (sin red), igual arrancamos la app sin glass
+    gsapScript.addEventListener('error', bootApp);
+  } else {
+    // No hay script de GSAP en el DOM (caso inesperado) — arrancamos igual
+    bootApp();
   }
 
 </script>
