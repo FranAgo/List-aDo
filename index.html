@@ -2677,10 +2677,11 @@
     renderCatBar();
     renderView();
 
-    // Set undo buffer and show undo toast
-    _undoBuffer = { ...t };
+    // Show undo toast first (commitPendingUndo inside will clear any previous buffer),
+    // then set the new buffer — order matters to avoid self-clearing the new entry
     if (_undoTimer) clearTimeout(_undoTimer);
     showToastUndo(`Tarea eliminada`, () => undoDelete());
+    _undoBuffer = { ...t };
 
     // After 4 s, commit deletion to API and clear buffer
     _undoTimer = setTimeout(() => {
