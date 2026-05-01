@@ -238,7 +238,7 @@
       top: 0;
       background: rgba(11, 11, 12, .95);
       backdrop-filter: blur(16px);
-      z-index: 10;
+      z-index: 200;
       box-shadow: 0 1px 0 rgba(255,255,255,0.04), 0 4px 20px rgba(0,0,0,0.4);
     }
 
@@ -3023,38 +3023,83 @@
    * Si es la primera vez, salta directo (sin animación).
    * Si ya había uno activo, ejecuta la secuencia expand → translate → settle.
    */
-  function lgMoveTo(activeBtn) {
+  // ─── LIQUID GLASS — COLOR STATE ─────────────────────────────────────────────
+  // Guardamos el color visual actual del indicador para interpolar correctamente
+  // incluso cuando una animación se interrumpe a mitad de camino.
+  // En lugar de confiar en un flag, leemos el color real con getComputedStyle
+  // en el momento del killTweensOf — así siempre interpolamos desde lo que
+  // el usuario realmente ve, no desde lo que el código cree que debería verse.
+
+  /** Interpola linealmente entre dos colores rgba en t (0..1) */
+  function lgLerpColor(from, to, t) {
+    const parse = s => (s.match(/[\d.]+/g) || []).map(Number);
+    const [r1=0,g1=0,b1=0,a1=0] = parse(from);
+    const [r2=0,g2=0,b2=0,a2=0] = parse(to);
+    const r = Math.round(r1 + (r2 - r1) * t);
+    const g = Math.round(g1 + (g2 - g1) * t);
+    const b = Math.round(b1 + (b2 - b1) * t);
+    const a = +(a1 + (a2 - a1) * t).toFixed(3);
+    return `rgba(${r}, ${g}, ${b}, ${a})`;
+  }
+
+  /** Aplica fondo + borde + sombra al indicador */
+  function lgApplyColor(bg, border) {
+    lgIndicator.style.background  = bg;
+    lgIndicator.style.borderColor = border;
+    lgIndicator.style.boxShadow   = [
+      'inset 0 1px 0 rgba(255,255,255,0.18)',
+      'inset 0 -1px 0 rgba(0,0,0,0.12)',
+      '0 2px 16px rgba(0,0,0,0.35)',
+      `0 0 0 1px ${border}`,
+    ].join(', ');
+  }
+
+  /**
+   * Lee el background-color visual actual del indicador directamente del DOM.
+   * Esto garantiza que si una animación fue interrumpida a mitad de camino,
+   * el color de origen para la próxima interpolación sea el que el usuario
+   * realmente ve — no el color destino que nunca se llegó a aplicar.
+   */
+  function lgReadCurrentBg() {
+    const cs = getComputedStyle(lgIndicator);
+    return cs.backgroundColor || 'rgba(200, 240, 96, 0.32)';
+  }
+
+  function lgReadCurrentBorder() {
+    const cs = getComputedStyle(lgIndicator);
+    return cs.borderTopColor || 'rgba(200, 240, 96, 0.35)';
+  }
+
+  function lgMoveTo(activeBtn, destBg, destBorder) {
     if (!lgIndicator || !activeBtn) return;
-    // Guard: si GSAP no cargó (CDN fallido), no intentar usarlo
     if (typeof gsap === 'undefined') return;
 
-    // Detectar preferencia de movimiento reducido
     const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
-    const rect = lgGetBtnRect(activeBtn);
+    const rect   = lgGetBtnRect(activeBtn);
     const catBar = document.getElementById('cat-bar');
 
-    // Primera vez: posicionar sin animación y mostrar
+    // Primera vez: posicionar y colorear sin animación
     if (!lgInitDone) {
+      lgApplyColor(destBg, destBorder);
       gsap.set(lgIndicator, {
         left:    rect.left,
         top:     rect.top,
         width:   rect.width,
         height:  rect.height,
         opacity: 1,
+        zIndex:  9,
       });
       catBar.classList.add('lg-active');
-      lgIndicator.style.opacity = '1';
       lgCurrentBtn = activeBtn;
       lgInitDone   = true;
       return;
     }
 
-    // Si el destino es el mismo botón, no hacer nada
     if (lgCurrentBtn === activeBtn) return;
 
-    // Reduced motion: salto directo
+    // Reduced motion: salto directo con color final
     if (prefersReduced) {
+      lgApplyColor(destBg, destBorder);
       gsap.set(lgIndicator, {
         left:   rect.left,
         top:    rect.top,
@@ -3065,64 +3110,95 @@
       return;
     }
 
-    // Matar animaciones previas si el usuario clickeó muy rápido
-    gsap.killTweensOf(lgIndicator);
+    // Capturar color visual actual ANTES de matar tweens —
+    // getComputedStyle lee el valor renderizado real, incluso si la animación
+    // anterior fue interrumpida a mitad de camino.
+    const fromBg     = lgReadCurrentBg();
+    const fromBorder = lgReadCurrentBorder();
 
+    gsap.killTweensOf(lgIndicator);
     lgCurrentBtn = activeBtn;
 
-    // ── FASE 1: Expand (el glass "respira" antes de moverse) ──────────────────
-    // ── FASE 2: Translate (viaja al destino, con scale volviendo a 1) ─────────
-    // ── FASE 3: Settle (pequeño bounce al aterrizar) ──────────────────────────
-    const tl = gsap.timeline();
+    const tl = gsap.timeline({
+      defaults: { ease: 'power3.inOut' },
+      onUpdate: function() {
+        // Interpolar color: completa la transición durante la primera mitad del viaje
+        const t = Math.min(tl.progress() * 2, 1);
+        lgIndicator.style.background  = lgLerpColor(fromBg,     destBg,     t);
+        lgIndicator.style.borderColor = lgLerpColor(fromBorder, destBorder, t);
+      },
+      onComplete: function() {
+        // Fijar color final limpio al terminar
+        lgApplyColor(destBg, destBorder);
+      },
+    });
 
+    // FASE 1: Expand inicial — el pill respira antes de soltarse
     tl.to(lgIndicator, {
-      scaleX:   1.12,
-      scaleY:   1.18,
-      duration: 0.13,
+      scaleX:   1.18,
+      scaleY:   1.22,
+      zIndex:   99,     // sube sobre todos los botones durante el viaje
+      duration: 0.14,
       ease:     'power2.out',
     });
 
+    // FASE 2: Stretch — se alarga y aplana como gota acelerando
+    tl.to(lgIndicator, {
+      scaleX:   1.32,
+      scaleY:   0.72,
+      duration: 0.12,
+      ease:     'power2.in',
+    });
+
+    // FASE 3: Translate — viaja al destino manteniendo el stretch
     tl.to(lgIndicator, {
       left:     rect.left,
       top:      rect.top,
       width:    rect.width,
       height:   rect.height,
-      scaleX:   1,
-      scaleY:   1,
-      duration: 0.32,
+      duration: 0.28,
       ease:     'power3.inOut',
     });
 
-    // Settle: leve bounce en Y para sensación de aterrizaje físico
+    // FASE 4: Impact — se aplasta al llegar
     tl.to(lgIndicator, {
-      scaleY:   1.04,
-      duration: 0.08,
-      ease:     'power1.out',
+      scaleX:   1.14,
+      scaleY:   0.82,
+      duration: 0.09,
+      ease:     'power2.out',
     });
 
+    // FASE 5: Overshoot vertical — rebota hacia arriba
     tl.to(lgIndicator, {
+      scaleX:   0.94,
+      scaleY:   1.20,
+      duration: 0.12,
+      ease:     'power2.out',
+    });
+
+    // FASE 6: Settle — se asienta con amortiguación elástica y baja z-index
+    tl.to(lgIndicator, {
+      scaleX:   1,
       scaleY:   1,
-      duration: 0.18,
-      ease:     'elastic.out(1, 0.5)',
+      zIndex:   9,      // vuelve a su z-index normal
+      duration: 0.38,
+      ease:     'elastic.out(1, 0.42)',
     });
   }
 
   /**
-   * Busca el botón activo en cat-bar y mueve el indicador.
+   * Busca el botón activo en cat-bar, resuelve su color destino y mueve el indicador.
    * Se llama cada vez que renderCatBar() termina.
    */
   function lgSyncWithActiveBtn() {
-    // Si no hay GSAP disponible (raro pero posible), salir silencioso
     if (typeof gsap === 'undefined') return;
 
     const catBar = document.getElementById('cat-bar');
     if (!catBar) return;
 
-    // Buscar el botón con .active (el de "Tareas de hoy" o cualquier lista)
     const activeBtn = catBar.querySelector('.cat-btn.active');
 
     if (!activeBtn) {
-      // No hay activo: ocultar indicador
       gsap.to(lgIndicator, { opacity: 0, duration: 0.15 });
       catBar.classList.remove('lg-active');
       lgCurrentBtn = null;
@@ -3130,8 +3206,22 @@
       return;
     }
 
+    // Resolver color destino: accent para "hoy", color de paleta para listas
+    let destBg, destBorder;
+    const catName = activeBtn.dataset.cat;
+    if (catName && catColors[catName]) {
+      // Amplificar opacidad del tinte (×2.5, máx 0.38) para visibilidad sobre dark bg
+      const raw  = catColors[catName].bg;
+      destBg     = raw.replace(/([.\d]+)\)$/, (_, v) => `${Math.min(parseFloat(v) * 2.5, 0.38)})`);
+      destBorder = catColors[catName].border;
+    } else {
+      // "Tareas de hoy" — tinte accent verde
+      destBg     = 'rgba(200, 240, 96, 0.32)';
+      destBorder = 'rgba(200, 240, 96, 0.35)';
+    }
+
     catBar.classList.add('lg-active');
-    lgMoveTo(activeBtn);
+    lgMoveTo(activeBtn, destBg, destBorder);
   }
 
   /**
