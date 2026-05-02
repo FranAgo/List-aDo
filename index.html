@@ -2224,14 +2224,15 @@
   function switchCat(c) {
     currentCat = c;
     listSearchQuery = '';
-    // Reset liquid glass antes de que renderCatBar destruya y recree
-    // los nodos del cat-bar — evita que tweens apunten a referencias DOM viejas.
-    if (typeof gsap !== 'undefined' && typeof lgIndicator !== 'undefined') {
-      gsap.killTweensOf(lgIndicator);
-      gsap.set(lgIndicator, { scaleX: 1, scaleY: 1 });
+    // Matar tweens GSAP en curso antes de que renderCatBar destruya los nodos.
+    // NO tocamos lgInitDone ni lgCurrentBtn desde acá — esas variables viven
+    // en el scope de la sección liquid glass (más abajo) y switchCat no tiene
+    // acceso correcto a ellas. El reposicionamiento lo maneja lgSyncWithActiveBtn
+    // vía el doble rAF que dispara renderCatBar.
+    if (typeof gsap !== 'undefined') {
+      const ind = document.getElementById('lg-indicator');
+      if (ind) { gsap.killTweensOf(ind); gsap.set(ind, { scaleX: 1, scaleY: 1 }); }
     }
-    lgInitDone   = false;
-    lgCurrentBtn = null;
     renderCatBar();
     const vc = document.getElementById('view-container');
     if (!vc) { renderView(); return; }
@@ -2675,11 +2676,9 @@
         setTimeout(() => card.classList.add('dragging'), 0);
         e.dataTransfer.effectAllowed = 'move';
         // Pausar el liquid glass durante el drag de tareas.
-        // Si hay un tween GSAP en curso, congelarlo en su posición actual
-        // para que no siga animando sobre botones que podrían reordenarse.
-        if (typeof gsap !== 'undefined' && typeof lgIndicator !== 'undefined') {
-          gsap.killTweensOf(lgIndicator);
-          gsap.set(lgIndicator, { scaleX: 1, scaleY: 1 });
+        if (typeof gsap !== 'undefined') {
+          const ind = document.getElementById('lg-indicator');
+          if (ind) { gsap.killTweensOf(ind); gsap.set(ind, { scaleX: 1, scaleY: 1 }); }
         }
       });
       card.addEventListener('dragend', () => {
