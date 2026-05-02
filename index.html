@@ -3141,7 +3141,8 @@
     if (action === 'edit')        { editTask(id); return; }
     if (action === 'del')         { doDelete(id); return; }  // direct delete with undo toast
 
-    // Modal backdrop clicks
+    // Modal backdrop clicks — ignorar si el mousedown empezó dentro del contenido
+    if (_modalMousedownOnContent) return;
     if (t.id === 'task-modal-bg')       { closeTaskModal(); return; }
     if (t.id === 'cat-modal-bg')        { closeCatModal(); return; }
     if (t.id === 'rename-cat-modal-bg') { closeRenameCatModal(); return; }
@@ -3189,9 +3190,32 @@
   });
 
   // Modal backdrop clicks
-  document.getElementById('task-modal-bg').addEventListener('click',       e => { if (e.target.id === 'task-modal-bg') closeTaskModal(); });
-  document.getElementById('cat-modal-bg').addEventListener('click',        e => { if (e.target.id === 'cat-modal-bg') closeCatModal(); });
-  document.getElementById('rename-cat-modal-bg').addEventListener('click', e => { if (e.target.id === 'rename-cat-modal-bg') closeRenameCatModal(); });
+  // Guard: si el mousedown empezó dentro del contenido del modal, ignorar el click
+  // aunque el mouseup haya ocurrido sobre el backdrop (drag que termina afuera).
+  let _modalMousedownOnContent = false;
+  ['task-modal-bg', 'cat-modal-bg', 'rename-cat-modal-bg'].forEach(id => {
+    const bg = document.getElementById(id);
+    bg.addEventListener('mousedown', e => {
+      // Si el click empezó dentro del cuadro (no en el backdrop mismo), lo marcamos
+      _modalMousedownOnContent = e.target.id !== id;
+    });
+  });
+  // Reseteo incondicional al soltar el mouse: evita que el flag quede sucio
+  // si el mouseup cae fuera de cualquier backdrop y el click nunca lo limpia.
+  document.addEventListener('mouseup', () => { _modalMousedownOnContent = false; });
+
+  document.getElementById('task-modal-bg').addEventListener('click',       e => {
+    if (_modalMousedownOnContent) return;
+    if (e.target.id === 'task-modal-bg') closeTaskModal();
+  });
+  document.getElementById('cat-modal-bg').addEventListener('click',        e => {
+    if (_modalMousedownOnContent) return;
+    if (e.target.id === 'cat-modal-bg') closeCatModal();
+  });
+  document.getElementById('rename-cat-modal-bg').addEventListener('click', e => {
+    if (_modalMousedownOnContent) return;
+    if (e.target.id === 'rename-cat-modal-bg') closeRenameCatModal();
+  });
 
   // Keyboard shortcuts
   document.addEventListener('keydown', e => {
