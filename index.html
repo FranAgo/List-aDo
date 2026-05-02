@@ -1988,6 +1988,15 @@
     }
     if (Array.isArray(tks)) {
       tasks = tks.map(t => ({ ...t, due: normalizeToISO(t.due) }));
+
+      // Purge todayIds: remove any IDs that no longer exist in the tasks list.
+      // This prevents deleted tasks (especially overdue ones) from reappearing
+      // in "Tareas de hoy" after a page reload, since checkOverdue() would
+      // otherwise re-add them from a stale localStorage entry.
+      const existingIds = new Set(tasks.map(t => t.id));
+      todayIds.forEach(id => { if (!existingIds.has(id)) todayIds.delete(id); });
+      saveToday();
+
       checkOverdue();
     }
     updateStats();
