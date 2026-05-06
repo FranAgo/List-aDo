@@ -12,8 +12,8 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzAwMDAwMCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI3MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsIFRpbWVzIE5ldyBSb21hbiwgc2VyaWYiIGZvbnQtc2l6ZT0iNTgiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNENEZGNUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkw8L3RleHQ+Cjwvc3ZnPg==" />
   <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTAwIj4KICA8Y2lyY2xlIGN4PSI1MCIgY3k9IjUwIiByPSI0NiIgZmlsbD0iIzAwMDAwMCIvPgogIDx0ZXh0IHg9IjUwIiB5PSI3MCIgZm9udC1mYW1pbHk9Ikdlb3JnaWEsIFRpbWVzIE5ldyBSb21hbiwgc2VyaWYiIGZvbnQtc2l6ZT0iNTgiIGZvbnQtd2VpZ2h0PSI3MDAiIGZpbGw9IiNENEZGNUUiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkw8L3RleHQ+Cjwvc3ZnPg==" />
-  <!-- GSAP — animación del liquid glass indicator -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+  <!-- GSAP — stagger de cards (carga async, no bloquea boot) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" async></script>
 
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link
@@ -375,6 +375,7 @@
       border-radius: 20px;
       padding: 6px 15px;
       font-size: 0.75rem;
+      font-weight: 500;       /* fijo en todos — evita reflow al activar */
       color: var(--text2);
       cursor: pointer;
       font-family: 'DM Sans', sans-serif;
@@ -387,7 +388,7 @@
     }
 
     .cat-btn:hover  { border-color: var(--border3); color: var(--text); background: var(--surface3); }
-    .cat-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 500; box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-sm); }
+    .cat-btn.active { background: var(--accent); color: var(--accent-text); border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow), var(--shadow-sm); }
 
     .cat-count { font-size: 0.625rem; opacity: .65; }
 
@@ -1480,9 +1481,9 @@
       padding: 0 1px;
     }
 
-    /* ─── LIQUID GLASS INDICATOR ─────────────────────────────────────────────── */
+    /* ─── LIQUID GLASS INDICATOR ────────────────────────────────────────────── */
 
-    /* SVG filter oculto — define la distorsión óptica del glass */
+    /* SVG filter host — invisible, solo define filtros referenciados por ID */
     .lg-filter-host {
       position: absolute;
       width: 0;
@@ -1491,135 +1492,128 @@
       pointer-events: none;
     }
 
+    /* .main necesita position:relative — el indicador es absolute relativo a él */
+    .main {
+      position: relative;
+    }
+
     /*
-      Indicador flotante que viaja entre listas.
-      Posicionado en absolute sobre .cat-bar (que pasa a relative).
-      z-index por debajo de los botones para no bloquear clicks.
+      El indicador tiene tres capas apiladas:
+        1. #lg-indicator        → forma + color tintado + sombra exterior
+        2. #lg-refraction       → backdrop-filter con SVG displacement → refracción
+        3. #lg-specular         → specular rim CSS puro → borde brillante
+      Los botones (z-index: 11) siempre quedan encima.
     */
+
     #lg-indicator {
-      position: fixed;
-      top: 0;
-      left: 0;
-      height: 0;
-      width: 0;
+      position: absolute;
+      top: 0; left: 0;
+      width: 0; height: 0;
       border-radius: 20px;
       pointer-events: none;
-      z-index: 9;
+      z-index: 10;
       opacity: 0;
-      will-change: transform, width, height, top, left;
-
-      /* Fondo visible sobre dark — tinte blanco semi-transparente */
-      background: rgba(255, 255, 255, 0.11);
-      border: 1px solid rgba(255, 255, 255, 0.28);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.22),
-        inset 0 -1px 0 rgba(0, 0, 0, 0.15),
-        0 2px 12px rgba(0, 0, 0, 0.4),
-        0 0 0 1px rgba(255, 255, 255, 0.06);
-
+      will-change: transform;
       overflow: hidden;
+
+      /* Fondo base: tinte de color — lgApplyColor lo sobreescribe dinámicamente */
+      background: rgba(255, 255, 255, 0.10);
+
+      /* Borde definido: 1px sólido semi-transparente que sigue el border-radius */
+      border: 1px solid rgba(255, 255, 255, 0.28);
+
+      /* Sombra exterior contenida — sin spread para no derramar */
+      box-shadow:
+        0 2px 12px rgba(0, 0, 0, 0.40),
+        0 1px  4px rgba(0, 0, 0, 0.20);
     }
 
-    /* Specular highlight — franja de luz interna */
-    #lg-indicator::before {
-      content: '';
+    /* Capa de refracción: blur + displacement SVG sobre el fondo */
+    #lg-refraction {
       position: absolute;
-      top: 0;
-      left: 10%;
-      width: 80%;
-      height: 40%;
-      background: linear-gradient(
-        180deg,
-        rgba(255, 255, 255, 0.14) 0%,
-        transparent 100%
-      );
-      border-radius: 0 0 50% 50%;
+      inset: -1px;           /* 1px extra para cubrir el borde */
+      border-radius: inherit;
       pointer-events: none;
+      /* backdrop-filter con SVG: Chrome/Edge. Safari usa el blur simple del fallback */
+      backdrop-filter:          blur(12px) saturate(1.6) brightness(1.08) url(#lg-refract);
+      -webkit-backdrop-filter:  blur(12px) saturate(1.6) brightness(1.08);
     }
 
-    /* Capa de distorsión — backdrop-filter + SVG filter */
-    #lg-distortion {
+    /* Specular rim: reflejo de luz que sigue la curvatura del pill */
+    #lg-specular {
       position: absolute;
       inset: 0;
       border-radius: inherit;
-      /* backdrop-filter aplica el blur base y el SVG de distorsión */
-      backdrop-filter: blur(8px) url(#lg-glass-filter);
-      -webkit-backdrop-filter: blur(8px) url(#lg-glass-filter);
       pointer-events: none;
+      /* Gradiente suave — opacidad moderada para no quemar el contorno */
+      background: linear-gradient(
+        180deg,
+        rgba(255, 255, 255, 0.22)  0%,
+        rgba(255, 255, 255, 0.06)  40%,
+        rgba(255, 255, 255, 0.00)  70%
+      );
     }
 
-    /* Fallback: si backdrop-filter no soporta url(), mantenemos el blur simple */
-    @supports not (backdrop-filter: url(#x)) {
-      #lg-distortion {
-        backdrop-filter: blur(10px) saturate(1.4);
-        -webkit-backdrop-filter: blur(10px) saturate(1.4);
-        background: rgba(255, 255, 255, 0.05);
-      }
+    /* Línea especular superior: sigue el border-radius del pill */
+    #lg-specular::before {
+      content: '';
+      position: absolute;
+      top: 1px; left: 8%; width: 84%; height: 1px;
+      background: linear-gradient(
+        90deg,
+        transparent 0%,
+        rgba(255, 255, 255, 0.55) 20%,
+        rgba(255, 255, 255, 0.70) 50%,
+        rgba(255, 255, 255, 0.55) 80%,
+        transparent 100%
+      );
+      border-radius: 1px;
     }
 
-    /* Los botones necesitan z-index mayor que el indicador fixed */
+    /* Botones inactivos debajo del indicador durante el viaje */
     .cat-bar .cat-btn,
     .cat-bar .new-cat-btn,
     .cat-bar .global-search-btn {
       position: relative;
-      z-index: 10;
+      z-index: 11;
     }
 
-    /* Cuando hay glass activo, limpiar fondo y glow de todos los botones activos.
-       El color de texto se preserva — viene del inline style en los botones de lista,
-       y del color de accent para "Tareas de hoy" (que mantiene su color original). */
+    /* Botón activo: siempre encima del glass para que su texto sea visible */
+    .cat-bar .cat-btn.active {
+      z-index: 13;
+    }
+
+    /* Botón activo: pierde su fondo (el glass lo reemplaza) */
     .cat-bar.lg-active .cat-btn.active {
       background: transparent !important;
-      box-shadow: none !important;
-      transition: color .18s, border-color .18s, font-weight .18s !important;
+      box-shadow:  none !important;
     }
 
-    /* Botones inactivos también transicionan suavemente cuando el glass pasa por encima */
-    .cat-bar.lg-active .cat-btn:not(.active) {
-      transition: color .18s, border-color .18s, background .18s, box-shadow .18s;
-    }
-
-    /* Para "Tareas de hoy" específicamente, restaurar el color de texto original
-       ya que .cat-btn.active lo sobreescribe a --accent-text (negro) */
+    /* "Tareas de hoy": restaurar color de texto que .active pisa */
     .cat-bar.lg-active .cat-btn.active[data-cat-action="today"] {
       color: var(--accent) !important;
     }
 
     /* ─── LIQUID GLASS PREVIEW (hover) ─────────────────────────────────────── */
     #lg-preview {
-      position: fixed;
-      top: 0;
-      left: 0;
-      height: 0;
-      width: 0;
+      position: absolute;
+      top: 0; left: 0;
+      width: 0; height: 0;
       border-radius: 20px;
       pointer-events: none;
-      z-index: 8;           /* debajo del indicador principal (z-index 9) */
+      z-index: 9;
       opacity: 0;
-      will-change: transform, width, height, top, left, opacity;
-      background: rgba(255, 255, 255, 0.055);
-      border: 1px solid rgba(255, 255, 255, 0.13);
-      box-shadow:
-        inset 0 1px 0 rgba(255, 255, 255, 0.10),
-        0 2px 8px rgba(0, 0, 0, 0.25);
-      transition: opacity .14s ease;
       overflow: hidden;
+      backdrop-filter: blur(8px) saturate(1.3);
+      -webkit-backdrop-filter: blur(8px) saturate(1.3);
+      background: rgba(255, 255, 255, 0.06);
+      box-shadow:
+        inset 0 1px 0 rgba(255, 255, 255, 0.30),
+        0 2px 10px rgba(0, 0, 0, 0.20);
+      transition: opacity .14s ease;
     }
 
-    /* Specular highlight sutil en el preview */
-    #lg-preview::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 15%;
-      width: 70%;
-      height: 40%;
-      background: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, transparent 100%);
-      border-radius: 0 0 50% 50%;
-      pointer-events: none;
-    }
-
-    /* Reduced motion — el indicador salta directo, sin animación */
+    /* Reduced motion — salta directo, sin animación */
     @media (prefers-reduced-motion: reduce) {
       #lg-indicator {
         transition: none !important;
@@ -1758,30 +1752,37 @@
 </head>
 <body>
 
-<!-- ─── LIQUID GLASS — SVG FILTER (inline, referenciado por id) ─────────────── -->
+<!-- ─── LIQUID GLASS — SVG FILTERS ──────────────────────────────────────────── -->
 <!--
-  feGaussianBlur: desenfoca ligeramente la imagen del source para suavizar la distorsión.
-  feTurbulence:   genera un campo de ruido orgánico (la "textura" del vidrio).
-  feDisplacementMap: usa ese ruido para desplazar píxeles del backdrop → distorsión óptica real.
-  feComposite:    recorta el resultado al shape del elemento (evita overflow de distorsión).
+  lg-refract: simula refracción en los bordes de la cápsula.
+  Pipeline:
+    1. feTurbulence  → ruido orgánico base (textura de vidrio)
+    2. feGaussianBlur → suaviza el ruido para que la distorsión sea fluida
+    3. feDisplacementMap → desplaza el backdrop según el mapa de ruido
+  El scale bajo (4) da un efecto sutil; el blur del ruido (2) lo hace orgánico.
 -->
 <svg class="lg-filter-host" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <filter id="lg-glass-filter" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+    <filter id="lg-refract" x="-15%" y="-15%" width="130%" height="130%"
+            color-interpolation-filters="sRGB">
+      <!-- Ruido orgánico de baja frecuencia → distorsión fluida, no granulada -->
       <feTurbulence
         type="fractalNoise"
-        baseFrequency="0.65 0.75"
-        numOctaves="3"
-        seed="2"
+        baseFrequency="0.018 0.022"
+        numOctaves="4"
+        seed="5"
         result="noise"
       />
+      <!-- Suavizar el mapa de ruido → transiciones más suaves entre zonas -->
+      <feGaussianBlur in="noise" stdDeviation="2" result="smoothNoise" />
+      <!-- Desplazar el backdrop según el mapa suavizado -->
       <feDisplacementMap
         in="SourceGraphic"
-        in2="noise"
-        scale="6"
+        in2="smoothNoise"
+        scale="7"
         xChannelSelector="R"
         yChannelSelector="G"
-        result="displaced"
+        result="refracted"
       />
     </filter>
   </defs>
@@ -1823,11 +1824,12 @@
   </div>
   <div class="main">
     <div class="cat-bar" id="cat-bar"></div>
-    <!-- Liquid glass indicator — fuera de cat-bar para que renderCatBar no lo destruya -->
+    <!-- Liquid glass indicator — absolute relativo a .main, 3 capas -->
     <div id="lg-indicator" aria-hidden="true">
-      <div id="lg-distortion"></div>
+      <div id="lg-refraction"></div>
+      <div id="lg-specular"></div>
     </div>
-    <!-- Liquid glass preview — aparece en hover sobre botones inactivos -->
+    <!-- Liquid glass preview — hover sobre botones inactivos -->
     <div id="lg-preview" aria-hidden="true"></div>
     <div id="view-container">
       <div class="loading-wrap">
@@ -1956,6 +1958,14 @@
   // Global search
   let globalSearchOpen = false;
   let _gsrActions      = [];
+
+  // ─── LIQUID GLASS — estado global ──────────────────────────────────────────
+  // Declarados acá (antes de las funciones que los usan en drag/switchCat)
+  // para evitar que JS cree variables globales implícitas por hoisting.
+  const lgIndicator = document.getElementById('lg-indicator');
+  let lgCurrentBtn  = null;
+  let lgInitDone    = false;
+  let lgCurrentAnim = null;
 
   // Rename modal state
   let renamingCat = null;
@@ -2229,7 +2239,7 @@
       // lo reemplaza visualmente. Solo conservamos color de texto y borde.
       // Agregamos clase 'active' para que lgSyncWithActiveBtn pueda encontrarlo.
       const style  = isActive
-        ? `border-color:${col.border};color:${col.text};font-weight:500;`
+        ? `border-color:${col.border};color:${col.text};`
         : `border-color:${col.border};color:${col.text};`;
       const dragOver = catDragOverIdx === i ? 'border-left:3px solid var(--accent);' : '';
       h += `<button class="cat-btn ${isActive ? 'active' : ''}" style="${style}${dragOver}" draggable="true" data-cat="${esc(c)}" data-idx="${i}">${esc(c)} <span class="cat-count">${n}</span></button>`;
@@ -2246,11 +2256,9 @@
         e.dataTransfer.setData('text/plain', catDragIdx);
         btn.style.opacity = '0.4';
 
-        // Fix #3 (Duck): matar animación GSAP en curso antes del drag.
-        // renderCatBar() destruye y recrea los nodos del cat-bar, así que
-        // cualquier tween activo sobre lg-indicator quedaría apuntando a
-        // posiciones de botones que ya no existen en el DOM.
-        if (typeof gsap !== 'undefined') gsap.killTweensOf(lgIndicator);
+        // Cancelar animación del glass en curso antes del drag.
+        if (lgCurrentAnim) { lgCurrentAnim.cancel(); lgCurrentAnim = null; }
+        lgIndicator.style.transform = 'none';
         lgInitDone   = false;
         lgCurrentBtn = null;
       });
@@ -2293,9 +2301,11 @@
     });
 
     // Sincronizar liquid glass indicator con el botón activo.
-    // Doble rAF: el primero permite que el browser procese el nuevo DOM,
-    // el segundo espera a que el layout (flexbox, fuentes) esté resuelto.
-    requestAnimationFrame(() => requestAnimationFrame(lgSyncWithActiveBtn));
+    // 50ms da al browser tiempo suficiente para resolver el flex-wrap
+    // con fuentes variables (DM Sans) antes de leer getBoundingClientRect.
+    // setTimeout(0) y doble rAF no son suficientes cuando el wrap depende
+    // del ancho real del texto renderizado.
+    setTimeout(lgSyncWithActiveBtn, 50);
   }
 
   /** Lightweight visual update during drag — only updates border styles */
@@ -2310,18 +2320,9 @@
   function switchCat(c) {
     currentCat = c;
     listSearchQuery = '';
-    // Matar tweens GSAP en curso antes de que renderCatBar destruya los nodos.
-    // NO tocamos lgInitDone ni lgCurrentBtn desde acá — esas variables viven
-    // en el scope de la sección liquid glass (más abajo) y switchCat no tiene
-    // acceso correcto a ellas. El reposicionamiento lo maneja lgSyncWithActiveBtn
-    // vía el doble rAF que dispara renderCatBar.
-    if (typeof gsap !== 'undefined') {
-      const ind = document.getElementById('lg-indicator');
-      if (ind) gsap.killTweensOf(ind);
-      // El reset de scaleX/scaleY lo hace lgMoveTo() internamente, justo antes
-      // de arrancar la nueva timeline y después de leer el color con getComputedStyle.
-      // Hacerlo acá pisaba ese estado y causaba que el glass apareciera sin animar.
-    }
+    // Cancelar animación del glass — lgSyncWithActiveBtn lo reposicionará.
+    if (lgCurrentAnim) { lgCurrentAnim.cancel(); lgCurrentAnim = null; }
+    lgIndicator.style.transform = 'none';
     renderCatBar();
     const vc = document.getElementById('view-container');
     if (!vc) { renderView(); return; }
@@ -2765,10 +2766,8 @@
         setTimeout(() => card.classList.add('dragging'), 0);
         e.dataTransfer.effectAllowed = 'move';
         // Pausar el liquid glass durante el drag de tareas.
-        if (typeof gsap !== 'undefined') {
-          const ind = document.getElementById('lg-indicator');
-          if (ind) { gsap.killTweensOf(ind); gsap.set(ind, { scaleX: 1, scaleY: 1 }); }
-        }
+        if (lgCurrentAnim) { lgCurrentAnim.cancel(); lgCurrentAnim = null; }
+        lgIndicator.style.transform = 'none';
       });
       card.addEventListener('dragend', () => {
         card.classList.remove('dragging');
@@ -2922,26 +2921,29 @@
     renderCatBar();
     renderView();
 
-    // Show undo toast first (commitPendingUndo inside will clear any previous buffer),
-    // then set the new buffer — order matters to avoid self-clearing the new entry
-    if (_undoTimer) clearTimeout(_undoTimer);
+    // Commit deletion to API immediately so a reload doesn't restore the task.
+    // Undo re-creates the task via saveTask if the user acts within the window.
+    commitPendingUndo();
+    api({ action: 'deleteTask', id });
+
+    // Show undo toast — buffer holds the snapshot for potential restoration
     showToastUndo(`Tarea eliminada`, () => undoDelete());
     _undoBuffer = { ...t };
 
-    // After 4 s, commit deletion to API and clear buffer
+    // Clear buffer after 4 s (undo window expires)
+    if (_undoTimer) clearTimeout(_undoTimer);
     _undoTimer = setTimeout(() => {
-      if (_undoBuffer && _undoBuffer.id === id) {
-        api({ action: 'deleteTask', id });
-        _undoBuffer = null;
-      }
+      _undoBuffer = null;
+      _undoTimer  = null;
     }, 4000);
   }
 
   function undoDelete() {
     if (!_undoBuffer) return;
     clearTimeout(_undoTimer);
-    const t = { ..._undoBuffer };
+    const t    = { ..._undoBuffer };
     _undoBuffer = null;
+    _undoTimer  = null;
     tasks.unshift(t);
     if (t.due) {
       const d = parseLocalDate(t.due);
@@ -2951,6 +2953,8 @@
     updateStats();
     renderCatBar();
     renderView();
+    // Re-create on server since the delete was already committed immediately
+    api({ action: 'saveTask', task: JSON.stringify(t) });
     showToast('Tarea restaurada');
   }
 
@@ -3511,41 +3515,32 @@
 
   // ─── LIQUID GLASS INDICATOR ────────────────────────────────────────────────
   //
-  // El indicador es un div absoluto dentro de .cat-bar que viaja entre botones.
-  // Usa GSAP para la animación en 3 fases: expand → translate → settle.
-  // La distorsión óptica la provee el SVG filter + backdrop-filter en CSS.
-  // Usa GSAP para la animación en 3 fases: expand → translate → settle.
-  // La distorsión óptica la provee el SVG filter + backdrop-filter en CSS.
+  // ─── LIQUID GLASS — reescritura completa ──────────────────────────────────
+  //
+  // position: absolute relativo a .main.
+  // Coordenadas: getBoundingClientRect(btn) - getBoundingClientRect(main)
+  // → sin dependencia de viewport, DPR ni zoom del browser.
+  // Animación: Web Animations API nativa. Sin GSAP para el glass.
+  // Fases: aparece → expand → squish+travel → impact+expand → settle.
 
-  const lgIndicator = document.getElementById('lg-indicator');
-  let lgCurrentBtn  = null;   // botón activo anterior (para comparar)
-  let lgInitDone    = false;  // primer posicionamiento sin animación
+  // lgIndicator, lgCurrentBtn, lgInitDone, lgCurrentAnim → declarados al inicio del script
 
   /**
-   * Obtiene posición y dimensiones de un botón relativas al viewport.
-   * Usamos fixed positioning ahora que el indicador está fuera del cat-bar.
+   * Coordenadas del botón relativas a .main (el ancestro con position:relative).
+   * Usamos getBCR(btn) - getBCR(main) → sin dependencia de viewport ni DPR.
+   * Inset de 1px en cada lado para evitar desborde subpíxel.
    */
   function lgGetBtnRect(btn) {
-    const r = btn.getBoundingClientRect();
+    const main = document.querySelector('.main');
+    const rb   = btn.getBoundingClientRect();
+    const rm   = main ? main.getBoundingClientRect() : { left: 0, top: 0 };
     return {
-      left:   Math.round(r.left),
-      top:    Math.round(r.top),
-      width:  Math.round(r.width),
-      height: Math.round(r.height),
+      left:   rb.left - rm.left + 1,
+      top:    rb.top  - rm.top  + 1,
+      width:  rb.width  - 2,
+      height: rb.height - 2,
     };
   }
-
-  /**
-   * Posiciona el indicador sobre el botón activo.
-   * Si es la primera vez, salta directo (sin animación).
-   * Si ya había uno activo, ejecuta la secuencia expand → translate → settle.
-   */
-  // ─── LIQUID GLASS — COLOR STATE ─────────────────────────────────────────────
-  // Guardamos el color visual actual del indicador para interpolar correctamente
-  // incluso cuando una animación se interrumpe a mitad de camino.
-  // En lugar de confiar en un flag, leemos el color real con getComputedStyle
-  // en el momento del killTweensOf — así siempre interpolamos desde lo que
-  // el usuario realmente ve, no desde lo que el código cree que debería verse.
 
   /** Interpola linealmente entre dos colores rgba en t (0..1) */
   function lgLerpColor(from, to, t) {
@@ -3559,55 +3554,53 @@
     return `rgba(${r}, ${g}, ${b}, ${a})`;
   }
 
-  /** Aplica fondo + borde + sombra al indicador */
+  /**
+   * Aplica el color tintado al indicador.
+   * Con la nueva arquitectura de capas:
+   *   - bg  → background del #lg-indicator (tinte de color de la lista)
+   *   - La sombra exterior usa el color del tinte para el glow periférico
+   * El specular rim (#lg-specular) es puramente blanco/CSS — no cambia con el color.
+   */
   function lgApplyColor(bg, border) {
     lgIndicator.style.background  = bg;
     lgIndicator.style.borderColor = border;
-    lgIndicator.style.boxShadow   = [
-      'inset 0 1px 0 rgba(255,255,255,0.18)',
-      'inset 0 -1px 0 rgba(0,0,0,0.12)',
-      '0 2px 16px rgba(0,0,0,0.35)',
-      `0 0 0 1px ${border}`,
-    ].join(', ');
+    // Sin glow exterior de color — solo sombra oscura contenida
+    lgIndicator.style.boxShadow   = '0 2px 10px rgba(0,0,0,0.35)';
+  }
+
+  /** Lee el color visual actual del indicador (incluso si hay animación en curso) */
+  function lgReadCurrentBg() {
+    return getComputedStyle(lgIndicator).backgroundColor || 'rgba(200,240,96,0.32)';
+  }
+  function lgReadCurrentBorder() {
+    return getComputedStyle(lgIndicator).borderTopColor || 'rgba(200,240,96,0.35)';
   }
 
   /**
-   * Lee el background-color visual actual del indicador directamente del DOM.
-   * Esto garantiza que si una animación fue interrumpida a mitad de camino,
-   * el color de origen para la próxima interpolación sea el que el usuario
-   * realmente ve — no el color destino que nunca se llegó a aplicar.
+   * Mueve el indicador al botón destino.
+   * Primera vez: aparece directo sin animación.
+   * Siguientes: expand → squish+travel → impact+expand → settle.
    */
-  function lgReadCurrentBg() {
-    const cs = getComputedStyle(lgIndicator);
-    return cs.backgroundColor || 'rgba(200, 240, 96, 0.32)';
-  }
-
-  function lgReadCurrentBorder() {
-    const cs = getComputedStyle(lgIndicator);
-    return cs.borderTopColor || 'rgba(200, 240, 96, 0.35)';
-  }
-
   function lgMoveTo(activeBtn, destBg, destBorder) {
     if (!lgIndicator || !activeBtn) return;
-    if (typeof gsap === 'undefined') return;
 
-    // Ocultar preview al instante cuando el glass principal empieza a moverse
-    lgHidePreview();
-
-    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    const rect   = lgGetBtnRect(activeBtn);
     const catBar = document.getElementById('cat-bar');
+    const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-    // Primera vez: posicionar y colorear sin animación
+    // Forzar reflow del cat-bar antes de leer coordenadas
+    void catBar.offsetHeight;
+    const rect = lgGetBtnRect(activeBtn);
+
+    // — Primera vez: posicionar sin animación —
     if (!lgInitDone) {
       lgApplyColor(destBg, destBorder);
-      gsap.set(lgIndicator, {
-        left:    rect.left,
-        top:     rect.top,
-        width:   rect.width,
-        height:  rect.height,
-        opacity: 1,
-        zIndex:  9,
+      Object.assign(lgIndicator.style, {
+        left:    rect.left   + 'px',
+        top:     rect.top    + 'px',
+        width:   rect.width  + 'px',
+        height:  rect.height + 'px',
+        opacity: '1',
+        transform: 'none',
       });
       catBar.classList.add('lg-active');
       lgCurrentBtn = activeBtn;
@@ -3617,131 +3610,227 @@
 
     if (lgCurrentBtn === activeBtn) return;
 
-    // Reduced motion: salto directo con color final
+    // — Reduced motion: salto directo —
     if (prefersReduced) {
       lgApplyColor(destBg, destBorder);
-      gsap.set(lgIndicator, {
-        left:   rect.left,
-        top:    rect.top,
-        width:  rect.width,
-        height: rect.height,
+      Object.assign(lgIndicator.style, {
+        left:   rect.left   + 'px',
+        top:    rect.top    + 'px',
+        width:  rect.width  + 'px',
+        height: rect.height + 'px',
+        transform: 'none',
       });
       lgCurrentBtn = activeBtn;
       return;
     }
 
-    // Capturar color visual actual ANTES de matar tweens —
-    // getComputedStyle lee el valor renderizado real, incluso si la animación
-    // anterior fue interrumpida a mitad de camino.
+    // — Cancelar animación anterior si existe —
+    if (lgCurrentAnim) {
+      lgCurrentAnim.cancel();
+      lgCurrentAnim = null;
+    }
+
+    // Leer color visual actual ANTES de cambiar destino
     const fromBg     = lgReadCurrentBg();
     const fromBorder = lgReadCurrentBorder();
 
-    gsap.killTweensOf(lgIndicator);
-
-    // Limpiar transform residual de la animación interrumpida antes de arrancar
-    // la nueva. Sin esto, si el glass queda a mitad de un expand/stretch/settle,
-    // la próxima timeline hereda ese scale y el resultado se congela o salta.
-    gsap.set(lgIndicator, { scaleX: 1, scaleY: 1, zIndex: 9 });
+    // Leer posición actual del indicador desde el DOM
+    const fromLeft = parseFloat(lgIndicator.style.left) || 0;
+    const fromTop  = parseFloat(lgIndicator.style.top)  || 0;
 
     lgCurrentBtn = activeBtn;
 
-    const tl = gsap.timeline({
-      defaults: { ease: 'power3.inOut' },
-      onUpdate: function() {
-        // Interpolar color: completa la transición durante la primera mitad del viaje
-        const t = Math.min(tl.progress() * 2, 1);
-        lgIndicator.style.background  = lgLerpColor(fromBg,     destBg,     t);
-        lgIndicator.style.borderColor = lgLerpColor(fromBorder, destBorder, t);
+    // — Duración total —
+    const DUR = 900; // ms
+
+    // Dimensiones de origen (antes de tocar el DOM)
+    const fromWidth  = parseFloat(lgIndicator.style.width)  || rect.width;
+    const fromHeight = parseFloat(lgIndicator.style.height) || rect.height;
+
+    // Fijar SOLO posición destino — las dimensiones las animamos vía keyframes
+    // para que width/height transicionen junto con el movimiento.
+    Object.assign(lgIndicator.style, {
+      left: rect.left + 'px',
+      top:  rect.top  + 'px',
+    });
+
+    const dLeft = rect.left - fromLeft;
+    const dTop  = rect.top  - fromTop;
+
+    // ── KEYFRAMES ─────────────────────────────────────────────────────────────
+    // Usamos translate para el movimiento y animamos width/height directamente
+    // para que el tamaño llegue al destino recién al final, no antes.
+    //
+    // Fases:
+    //   0.00 → origen: tamaño y posición de partida
+    //   0.18 → contracción al mínimo (la gota se "recoge")
+    //   0.42 → punto medio del viaje, aún contraída (coincide con color cristal)
+    //   0.65 → llega al destino: posición final, tamaño destino, escala neutral
+    //   0.78 → overshoot expand
+    //   0.90 → leve compresión
+    //   1.00 → settle
+    //
+    // El tamaño mínimo de contracción es el promedio entre origen y destino * 0.72,
+    // para que el achicamiento/agrandamiento sea proporcional al cambio real de tamaño.
+    const midW = (fromWidth  + rect.width)  / 2 * 0.72;
+    const midH = (fromHeight + rect.height) / 2 * 0.72;
+
+    const keyframes = [
+      {
+        transform: `translate(${-dLeft}px, ${-dTop}px)`,
+        width:  fromWidth  + 'px',
+        height: fromHeight + 'px',
+        offset: 0,
+        easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
       },
-      onComplete: function() {
-        // Fijar color final limpio al terminar
+      {
+        // Contracción máxima: la gota se recoge en el origen
+        transform: `translate(${-dLeft}px, ${-dTop}px)`,
+        width:  midW + 'px',
+        height: midH + 'px',
+        offset: 0.18,
+        easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      },
+      {
+        // Viaja contraída hasta el punto medio
+        transform: `translate(${-dLeft * 0.42}px, ${-dTop * 0.42}px)`,
+        width:  midW + 'px',
+        height: midH + 'px',
+        offset: 0.42,
+        easing: 'cubic-bezier(0.2, 0, 0.4, 1)',
+      },
+      {
+        // Llega al destino: tamaño final correcto, posición final
+        transform: `translate(0px, 0px)`,
+        width:  rect.width  + 'px',
+        height: rect.height + 'px',
+        offset: 0.65,
+        easing: 'cubic-bezier(0.34, 1.5, 0.64, 1)',
+      },
+      {
+        // Overshoot: se expande levemente al llegar
+        transform: `translate(0px, 0px)`,
+        width:  (rect.width  * 1.10) + 'px',
+        height: (rect.height * 1.10) + 'px',
+        offset: 0.78,
+        easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+      },
+      {
+        // Compresión leve
+        transform: `translate(0px, 0px)`,
+        width:  (rect.width  * 0.98) + 'px',
+        height: (rect.height * 0.98) + 'px',
+        offset: 0.90,
+        easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+      },
+      {
+        // Settle final: tamaño exacto del botón destino
+        transform: `translate(0px, 0px)`,
+        width:  rect.width  + 'px',
+        height: rect.height + 'px',
+        offset: 1.00,
+      },
+    ];
+
+    // Subir z-index durante el viaje (queda sobre todos los botones inactivos)
+    lgIndicator.style.zIndex = '12';
+
+    const anim = lgIndicator.animate(keyframes, {
+      duration: DUR,
+      easing:   'ease-in-out',
+      fill:     'none',
+    });
+    lgCurrentAnim = anim;
+
+    // ── INTERPOLACIÓN DE COLOR ────────────────────────────────────────────────
+    // El color NO va directo de origen a destino.
+    // Pasa por un color "cristal neutro" (blanco puro con poca opacidad) en el
+    // punto medio del viaje — así se ve claramente la transición entre dos colores.
+    //
+    // Curva:
+    //   t = 0.00..0.35 → fromBg   → midBg   (desvanecer color de origen)
+    //   t = 0.35..0.65 → midBg    estable   (momento cristalino en vuelo)
+    //   t = 0.65..1.00 → midBg    → destBg  (teñirse con color destino)
+    //
+    // colorFrame captura `anim` localmente — si lgCurrentAnim cambia (click
+    // rápido), este loop detecta cancelación y para sin interferir.
+    const midBg     = 'rgba(255, 255, 255, 0.18)';
+    const midBorder = 'rgba(255, 255, 255, 0.40)';
+
+    const startTime = performance.now();
+    function colorFrame(now) {
+      if (anim.playState === 'finished' || anim.playState === 'idle') {
         lgApplyColor(destBg, destBorder);
-      },
-    });
+        return;
+      }
+      const t = Math.min((now - startTime) / DUR, 1);
 
-    // FASE 1: Expand inicial — el pill respira antes de soltarse
-    tl.to(lgIndicator, {
-      scaleX:   1.18,
-      scaleY:   1.22,
-      zIndex:   99,     // sube sobre todos los botones durante el viaje
-      duration: 0.14,
-      ease:     'power2.out',
-    });
+      let bg, border;
+      if (t < 0.35) {
+        // Fase 1: color origen → cristal neutro
+        const p = t / 0.35;
+        bg     = lgLerpColor(fromBg,     midBg,     p);
+        border = lgLerpColor(fromBorder, midBorder, p);
+      } else if (t < 0.65) {
+        // Fase 2: cristal puro en el punto medio del vuelo
+        bg     = midBg;
+        border = midBorder;
+      } else {
+        // Fase 3: cristal → color destino
+        const p = (t - 0.65) / 0.35;
+        bg     = lgLerpColor(midBg,     destBg,     p);
+        border = lgLerpColor(midBorder, destBorder, p);
+      }
 
-    // FASE 2: Stretch — se alarga y aplana como gota acelerando
-    tl.to(lgIndicator, {
-      scaleX:   1.32,
-      scaleY:   0.72,
-      duration: 0.12,
-      ease:     'power2.in',
-    });
+      lgIndicator.style.background  = bg;
+      lgIndicator.style.borderColor = border;
+      if (t < 1) requestAnimationFrame(colorFrame);
+    }
+    requestAnimationFrame(colorFrame);
 
-    // FASE 3: Translate — viaja al destino manteniendo el stretch
-    tl.to(lgIndicator, {
-      left:     rect.left,
-      top:      rect.top,
-      width:    rect.width,
-      height:   rect.height,
-      duration: 0.28,
-      ease:     'power3.inOut',
-    });
-
-    // FASE 4: Impact — se aplasta al llegar
-    tl.to(lgIndicator, {
-      scaleX:   1.14,
-      scaleY:   0.82,
-      duration: 0.09,
-      ease:     'power2.out',
-    });
-
-    // FASE 5: Overshoot vertical — rebota hacia arriba
-    tl.to(lgIndicator, {
-      scaleX:   0.94,
-      scaleY:   1.20,
-      duration: 0.12,
-      ease:     'power2.out',
-    });
-
-    // FASE 6: Settle — se asienta con amortiguación elástica y baja z-index
-    tl.to(lgIndicator, {
-      scaleX:   1,
-      scaleY:   1,
-      zIndex:   9,      // vuelve a su z-index normal
-      duration: 0.38,
-      ease:     'elastic.out(1, 0.42)',
-    });
+    anim.onfinish = () => {
+      if (lgCurrentAnim === anim) lgCurrentAnim = null;
+      lgApplyColor(destBg, destBorder);
+      // Fijar dimensiones y posición finales exactas en el DOM al terminar
+      Object.assign(lgIndicator.style, {
+        transform: 'none',
+        width:     rect.width  + 'px',
+        height:    rect.height + 'px',
+        zIndex:    '10',
+      });
+    };
+    anim.oncancel = () => {
+      lgIndicator.style.transform = 'none';
+      lgIndicator.style.zIndex    = '10';
+    };
   }
 
   /**
-   * Busca el botón activo en cat-bar, resuelve su color destino y mueve el indicador.
+   * Busca el botón activo, resuelve colores y mueve el indicador.
    * Se llama cada vez que renderCatBar() termina.
    */
   function lgSyncWithActiveBtn() {
-    if (typeof gsap === 'undefined') return;
-
     const catBar = document.getElementById('cat-bar');
     if (!catBar) return;
 
     const activeBtn = catBar.querySelector('.cat-btn.active');
 
     if (!activeBtn) {
-      gsap.to(lgIndicator, { opacity: 0, duration: 0.15 });
+      lgIndicator.style.opacity = '0';
       catBar.classList.remove('lg-active');
       lgCurrentBtn = null;
       lgInitDone   = false;
       return;
     }
 
-    // Resolver color destino: accent para "hoy", color de paleta para listas
+    // Resolver color destino: accent para "hoy", paleta para listas
     let destBg, destBorder;
     const catName = activeBtn.dataset.cat;
     if (catName && catColors[catName]) {
-      // Amplificar opacidad del tinte (×2.5, máx 0.38) para visibilidad sobre dark bg
       const raw  = catColors[catName].bg;
       destBg     = raw.replace(/([.\d]+)\)$/, (_, v) => `${Math.min(parseFloat(v) * 2.5, 0.38)})`);
       destBorder = catColors[catName].border;
     } else {
-      // "Tareas de hoy" — tinte accent verde
       destBg     = 'rgba(200, 240, 96, 0.32)';
       destBorder = 'rgba(200, 240, 96, 0.35)';
     }
@@ -3751,65 +3840,45 @@
   }
 
   /**
-   * Fix #2 (Duck): reposicionar el indicador si el layout cambia.
-   * Cubre: resize de ventana, rotación en mobile, cambio de zoom,
-   * y cualquier reflow que mueva los botones de fila (flex-wrap).
-   *
-   * Usamos ResizeObserver sobre #cat-bar en lugar de window 'resize'
-   * porque captura también cambios internos del contenedor (ej: nueva lista
-   * que hace que la barra wrappee a una segunda fila).
-   *
-   * Al detectar un cambio: reseteamos lgInitDone para que el próximo sync
-   * posicione sin animación (no queremos que el glass "viaje" al hacer resize).
+   * ResizeObserver sobre cat-bar: reposiciona el indicador si el layout cambia
+   * (nueva lista que hace wrap, resize de ventana, cambio de fuente).
    */
   const lgResizeObserver = new ResizeObserver(() => {
-    // Solo actuar si la app está visible y hay un indicador posicionado
     if (!lgInitDone) return;
-    lgInitDone = false;         // próximo sync posiciona sin animación
-    lgSyncWithActiveBtn();
+    lgInitDone = false;
+    setTimeout(lgSyncWithActiveBtn, 50);
   });
 
-  // Empezar a observar cuando la app arranque (llamado desde init())
   function lgStartObserving() {
     const catBar = document.getElementById('cat-bar');
     if (catBar) lgResizeObserver.observe(catBar);
 
-    // Re-sincronizar cuando las fuentes terminen de cargar —
-    // DM Sans cambia el ancho de los botones y desplaza el indicador
+    // Re-sincronizar cuando las fuentes carguen (DM Sans cambia anchos)
     if (document.fonts && document.fonts.ready) {
       document.fonts.ready.then(() => {
         lgInitDone = false;
-        lgSyncWithActiveBtn();
+        setTimeout(lgSyncWithActiveBtn, 50);
       });
     }
   }
 
   // ─── LIQUID GLASS — HOVER PREVIEW ────────────────────────────────────────
-  //
-  // Muestra una versión tenue del glass sobre el botón que el cursor está
-  // sobrevolando (sin hacer click). Da la sensación de que el indicador
-  // "anticipa" el destino antes de la acción.
-  //
-  // Implementación: mouseenter/mouseleave delegados en cat-bar.
-  // Solo actúa sobre botones inactivos — el botón activo ya tiene el glass real.
-  // No usa GSAP para el posicionamiento: es una transición CSS simple (opacity).
+  // Muestra una gota tenue sobre el botón que el cursor sobrevuela (sin click).
 
   const lgPreview = document.getElementById('lg-preview');
   let lgPreviewActive = false;
 
   function lgShowPreview(btn) {
     if (!lgPreview || !lgInitDone) return;
-    if (btn.classList.contains('active')) return; // el glass principal ya está acá
-    if (typeof gsap === 'undefined') return;
-
+    if (btn.classList.contains('active')) return;
     const rect = lgGetBtnRect(btn);
-    gsap.set(lgPreview, {
-      left:   rect.left,
-      top:    rect.top,
-      width:  rect.width,
-      height: rect.height,
+    Object.assign(lgPreview.style, {
+      left:   rect.left   + 'px',
+      top:    rect.top    + 'px',
+      width:  rect.width  + 'px',
+      height: rect.height + 'px',
+      opacity: '1',
     });
-    lgPreview.style.opacity = '1';
     lgPreviewActive = true;
   }
 
@@ -3819,8 +3888,6 @@
     lgPreviewActive = false;
   }
 
-  // Delegación de eventos en cat-bar — se re-bindea automáticamente
-  // porque cat-bar no se destruye (solo su contenido innerHTML)
   document.getElementById('cat-bar').addEventListener('mouseenter', e => {
     const btn = e.target.closest('.cat-btn');
     if (btn) lgShowPreview(btn);
@@ -3848,19 +3915,8 @@
     }
   }
 
-  const gsapScript = document.querySelector('script[src*="gsap"]');
-  if (typeof gsap !== 'undefined') {
-    // GSAP ya está disponible (caso normal — script bloqueante ya ejecutó)
-    bootApp();
-  } else if (gsapScript) {
-    // GSAP todavía cargando — esperamos su evento load
-    gsapScript.addEventListener('load', bootApp);
-    // Fallback: si el script falla (sin red), igual arrancamos la app sin glass
-    gsapScript.addEventListener('error', bootApp);
-  } else {
-    // No hay script de GSAP en el DOM (caso inesperado) — arrancamos igual
-    bootApp();
-  }
+  // GSAP es async (solo para stagger de cards) — el boot no depende de él.
+  bootApp();
 
 </script>
 </body>
