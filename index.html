@@ -432,6 +432,14 @@
       font-size: 1.7rem;
       letter-spacing: -.4px;
       color: var(--text);
+      will-change: clip-path, opacity;
+      transition: clip-path .15s ease, opacity .15s ease;
+      clip-path: inset(0% 0% 0% 0%);
+    }
+
+    .view-leaving .view-title {
+      clip-path: inset(50% 0% 50% 0%);
+      opacity: 0;
     }
 
     .view-title.today-title { color: var(--accent); }
@@ -505,11 +513,10 @@
 
     /* ─── TASK CARDS ─────────────────────────────────────────────────────────── */
     #view-container {
-      transition: opacity .13s ease, transform .13s ease;
+      transition: opacity .15s ease;
     }
     #view-container.view-leaving {
       opacity: 0;
-      transform: translateY(6px);
       pointer-events: none;
     }
 
@@ -1966,6 +1973,7 @@
   let lgCurrentBtn  = null;
   let lgInitDone    = false;
   let lgCurrentAnim = null;
+  let lgSwitching   = false; // true durante la animación de salida — bloquea lgSyncWithActiveBtn
 
   // Rename modal state
   let renamingCat = null;
@@ -2165,6 +2173,10 @@
     if (Array.isArray(tks)) {
       tasks = tks.map(t => ({ ...t, due: normalizeToISO(t.due) }));
 
+      // Poblar todayIds desde el campo today del sheet (fuente de verdad cross-device).
+      // El localStorage se usa como cache inicial pero el sheet tiene prioridad.
+      tasks.forEach(t => { if (t.today) todayIds.add(t.id); });
+
       // Purge todayIds: remove any IDs that no longer exist in the tasks list.
       // This prevents deleted tasks (especially overdue ones) from reappearing
       // in "Tareas de hoy" after a page reload, since checkOverdue() would
@@ -2193,7 +2205,11 @@
     const now = new Date();
     tasks.forEach(t => {
       const d = parseLocalDate(t.due);
-      if (d && !t.done && d < now) todayIds.add(t.id);
+      if (d && !t.done && d < now && !todayIds.has(t.id)) {
+        todayIds.add(t.id);
+        t.today = true;
+        api({ action: 'updateTask', task: JSON.stringify(t) });
+      }
     });
     saveToday();
   }
@@ -2320,12 +2336,13 @@
   function switchCat(c) {
     currentCat = c;
     listSearchQuery = '';
-    // Cancelar animación del glass — lgSyncWithActiveBtn lo reposicionará.
+    lgSwitching = true; // bloquear movimiento de píldora durante la salida
+    // Cancelar animación del glass — se reposicionará cuando llegue el nuevo título.
     if (lgCurrentAnim) { lgCurrentAnim.cancel(); lgCurrentAnim = null; }
     lgIndicator.style.transform = 'none';
     renderCatBar();
     const vc = document.getElementById('view-container');
-    if (!vc) { renderView(); return; }
+    if (!vc) { lgSwitching = false; renderView(); return; }
     // Cancelar transición anterior si llega una nueva antes de que termine
     if (_switchCatTimer) { clearTimeout(_switchCatTimer); _switchCatTimer = null; }
     vc.classList.add('view-leaving');
@@ -2333,6 +2350,8 @@
       _switchCatTimer = null;
       vc.classList.remove('view-leaving');
       renderView();
+      lgSwitching = false; // nuevo título ya está en el DOM — mover la píldora ahora
+      setTimeout(lgSyncWithActiveBtn, 50);
     }, 130);
   }
 
@@ -2650,6 +2669,8 @@
   function addToday(id) {
     todayIds.add(id);
     saveToday();
+    const t = tasks.find(x => x.id === id);
+    if (t) { t.today = true; api({ action: 'updateTask', task: JSON.stringify(t) }); }
     renderCatBar();
     renderView();
     showToast('Agregada a Tareas de hoy');
@@ -2660,6 +2681,7 @@
     if (t && isOverdue(t)) { showToast('Las tareas vencidas no se pueden quitar'); return; }
     todayIds.delete(id);
     saveToday();
+    if (t) { t.today = false; api({ action: 'updateTask', task: JSON.stringify(t) }); }
     renderCatBar();
     renderView();
     showToast('Quitada de Tareas de hoy');
@@ -2688,7 +2710,7 @@
           titleEl.classList.add('struck');
         }
       }
-      if (viewCat === 'today') { todayIds.delete(id); saveToday(); }
+      if (viewCat === 'today') { todayIds.delete(id); saveToday(); t.today = false; }
     } else {
       t.done = false;
       if (card) {
@@ -2699,7 +2721,7 @@
         card.classList.add('anim-uncomplete');
         await sleep(320);
       }
-      if (isOverdue(t)) { todayIds.add(id); saveToday(); }
+      if (isOverdue(t)) { todayIds.add(id); saveToday(); t.today = true; }
     }
     updateStats();
     renderCatBar();
@@ -2866,6 +2888,7 @@
       done:      existing ? existing.done : false,
       createdAt: existing ? existing.createdAt : Date.now(),
       order:     existing ? existing.order : maxOrder + 1,
+      today:     existing ? (existing.today || false) : false,
     };
 
     const result = await api({ action: currentEditingId ? 'updateTask' : 'saveTask', task: JSON.stringify(task) });
@@ -2947,7 +2970,7 @@
     tasks.unshift(t);
     if (t.due) {
       const d = parseLocalDate(t.due);
-      if (d && !t.done && d < new Date()) todayIds.add(t.id);
+      if (d && !t.done && d < new Date()) { todayIds.add(t.id); t.today = true; }
     }
     saveToday();
     updateStats();
@@ -3810,6 +3833,7 @@
    * Se llama cada vez que renderCatBar() termina.
    */
   function lgSyncWithActiveBtn() {
+    if (lgSwitching) return; // esperar a que el título nuevo esté visible
     const catBar = document.getElementById('cat-bar');
     if (!catBar) return;
 
