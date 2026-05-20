@@ -681,6 +681,13 @@
     .drag-handle:hover  { color: var(--text2); }
     .drag-handle:active { cursor: grabbing; }
 
+    /* Handle deshabilitado en tareas "por vencer" (fijas en el tope) */
+    .task-card[data-soon="true"] .drag-handle {
+      cursor: not-allowed;
+      opacity: .28;
+      pointer-events: none;
+    }
+
     .check-wrap {
       flex-shrink: 0;
       margin-top: 1px;
@@ -2229,8 +2236,32 @@
     if (!d) return false;
     const now = new Date();
     if (d < now) return false;
-    const twoDaysFromNow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 2, 23, 59, 59);
-    return d <= twoDaysFromNow;
+    const threeDaysFromNow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 3, 23, 59, 59);
+    return d <= threeDaysFromNow;
+  }
+
+  // ─── TASK SORT ─────────────────────────────────────────────────────────────
+  /**
+   * Comparador estándar para ordenar tareas en listas normales (no "Tareas de hoy"):
+   *   1. Completadas → al fondo
+   *   2. "Por vencer" (soon-due) → al tope de las pendientes
+   *      Orden entre ellas: due date asc → createdAt asc
+   *   3. Resto de pendientes → por orden manual (t.order)
+   */
+  function sortTasks(a, b) {
+    // 1. Completadas al fondo
+    if (a.done !== b.done) return a.done ? 1 : -1;
+    if (a.done && b.done) return (a.order || 0) - (b.order || 0);
+    // 2. Soon-due al tope
+    const aSoon = isSoonDue(a), bSoon = isSoonDue(b);
+    if (aSoon !== bSoon) return aSoon ? -1 : 1;
+    // 3. Entre dos soon-due: due date asc, desempate por createdAt asc
+    if (aSoon && bSoon) {
+      if (a.due !== b.due) return a.due < b.due ? -1 : 1;
+      return (Number(a.createdAt) || 0) - (Number(b.createdAt) || 0);
+    }
+    // 4. Entre pendientes normales: orden manual
+    return (a.order || 0) - (b.order || 0);
   }
 
   // ─── STATS ─────────────────────────────────────────────────────────────────
@@ -2362,10 +2393,7 @@
     if (currentCat === 'today') {
       list = tasks
         .filter(t => todayIds.has(t.id))
-        .sort((a, b) => {
-          if (a.done !== b.done) return a.done ? 1 : -1;
-          return (a.order || 0) - (b.order || 0);
-        });
+        .sort(sortTasks);
       vc.innerHTML = `
         <div class="view-header">
           <div class="view-title today-title">Tareas de hoy</div>
@@ -2380,10 +2408,7 @@
     } else {
       list = tasks
         .filter(t => t.category === currentCat && !todayIds.has(t.id))
-        .sort((a, b) => {
-          if (a.done !== b.done) return a.done ? 1 : -1;
-          return (a.order || 0) - (b.order || 0);
-        });
+        .sort(sortTasks);
       const hasPending = tasks.some(t => t.category === currentCat && !t.done);
       vc.innerHTML = `
         <div class="view-header">
@@ -2420,10 +2445,10 @@
       baseList = currentCat === 'today'
         ? tasks
             .filter(t => todayIds.has(t.id))
-            .sort((a, b) => { if (a.done !== b.done) return a.done ? 1 : -1; return (a.order||0) - (b.order||0); })
+            .sort(sortTasks)
         : tasks
             .filter(t => t.category === currentCat && !todayIds.has(t.id))
-            .sort((a, b) => { if (a.done !== b.done) return a.done ? 1 : -1; return (a.order||0) - (b.order||0); });
+            .sort(sortTasks);
     }
     const q        = listSearchQuery.toLowerCase().trim();
     const filtered = q
@@ -2627,6 +2652,7 @@
 
   function taskHTML(t, viewCat) {
     const over   = isOverdue(t);
+    const soon   = !over && viewCat !== 'today' && isSoonDue(t);
     const locked = over && todayIds.has(t.id);
     const catCol = getCatColor(t.category || '');
     let meta = '';
@@ -2648,7 +2674,7 @@
       <div class="swipe-wrap" id="sw-${t.id}">
         <div class="swipe-bg swipe-right"><span class="swipe-bg-icon">✓</span></div>
         <div class="swipe-bg swipe-left"><span class="swipe-bg-icon">✕</span></div>
-        <div class="task-card ${t.done?'done-card':''}" id="tc-${t.id}" data-id="${t.id}" data-viewcat="${viewCat}" data-overdue="${over}" draggable="true" style="--card-glow:${catCol.border};">
+        <div class="task-card ${t.done?'done-card':''}" id="tc-${t.id}" data-id="${t.id}" data-viewcat="${viewCat}" data-overdue="${over}" data-soon="${soon}" draggable="${soon ? 'false' : 'true'}" style="--card-glow:${catCol.border};">
           <div class="drag-handle">⠿</div>
           <div class="check-wrap">
             <button class="check-btn ${t.done?'checked':''}" data-action="toggle-done" data-id="${t.id}" data-viewcat="${viewCat}">
@@ -2784,6 +2810,8 @@
   function setupDrag(listEl, cat) {
     listEl.querySelectorAll('.task-card').forEach(card => {
       card.addEventListener('dragstart', e => {
+        // Bloquear drag en tareas "por vencer" — están fijas en el tope
+        if (card.dataset.soon === 'true') { e.preventDefault(); return; }
         dragSrcId = card.dataset.id;
         setTimeout(() => card.classList.add('dragging'), 0);
         e.dataTransfer.effectAllowed = 'move';
@@ -2803,11 +2831,14 @@
       card.addEventListener('dragover', e => {
         e.preventDefault();
         if (card.dataset.id === dragSrcId) return;
+        // No permitir soltar sobre una tarea "por vencer"
+        if (card.dataset.soon === 'true') { e.dataTransfer.dropEffect = 'none'; return; }
         listEl.querySelectorAll('.task-card').forEach(c => c.classList.remove('drag-over'));
         card.classList.add('drag-over');
       });
       card.addEventListener('drop', e => {
         e.preventDefault();
+        if (card.dataset.soon === 'true') return;
         card.classList.remove('drag-over');
         if (dragSrcId && card.dataset.id !== dragSrcId) reorder(dragSrcId, card.dataset.id, cat);
       });
