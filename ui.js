@@ -138,6 +138,10 @@ function _renderCatBarIndicator() {
 export function switchCat(c) {
   state.currentCat      = c;
   state.listSearchQuery = '';
+  // Resetear lgCurrentBtn para que lgMoveTo no compare contra un nodo muerto
+  // (los botones se re-renderizan en renderCatBar). lgInitDone se mantiene para
+  // preservar la animación de viaje entre listas existentes.
+  setLgCurrentBtn(null);
   setLgSwitching(true);
   if (lgCurrentAnim) { lgCurrentAnim.cancel(); setLgCurrentAnim(null); }
   lgIndicator.style.transform = 'none';
