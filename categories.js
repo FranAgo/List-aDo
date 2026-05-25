@@ -8,6 +8,7 @@ import { assignCatColor, catColors,
 import { renderCatBar, renderView,
          updateStats, showToast,
          showToastConfirm, esc }        from './ui.js';
+import { setLgCurrentBtn, setLgInitDone } from './animations.js';
 
 export function openCatModal() {
   document.getElementById('cat-name-inp').value = '';
@@ -29,6 +30,8 @@ export async function saveCategory() {
   localStorage.setItem(LORDER_KEY, JSON.stringify(state.listOrder));
   assignCatColor(name);
   state.currentCat = name;
+  setLgCurrentBtn(null);
+  setLgInitDone(false);
   renderCatBar();
   renderView();
   showToast('Lista creada');
@@ -68,6 +71,8 @@ export function confirmDelCat(cat) {
     state.listOrder  = state.listOrder.filter(c => c !== cat);
     localStorage.setItem(LORDER_KEY, JSON.stringify(state.listOrder));
     state.currentCat = 'today';
+    setLgCurrentBtn(null);
+    setLgInitDone(false);
     renderCatBar();
     renderView();
     showToast('Lista eliminada');
@@ -108,6 +113,8 @@ export async function saveRenameCategory() {
   api({ action: 'renameCategory', oldName, newName });
   state.tasks.filter(t => t.category === newName).forEach(t => api({ action: 'updateTask', task: JSON.stringify(t) }));
   updateStats();
+  setLgCurrentBtn(null);
+  setLgInitDone(false);
   renderCatBar();
   renderView();
   showToast('Lista renombrada');
