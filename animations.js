@@ -13,35 +13,23 @@ export let lgCurrentAnim   = null;
 export let lgSwitching     = false;
 export let lgPreviewActive = false;
 
-// Setters — necesarios porque ES modules no permiten asignar exports desde afuera
 export function setLgCurrentBtn(v)    { lgCurrentBtn    = v; }
 export function setLgInitDone(v)      { lgInitDone      = v; }
 export function setLgCurrentAnim(v)   { lgCurrentAnim   = v; }
 export function setLgSwitching(v)     { lgSwitching     = v; }
 export function setLgPreviewActive(v) { lgPreviewActive = v; }
 
-// ─── COORDENADAS ───────────────────────────────────────────────────────────────
-/**
- * Coordenadas del botón relativas a .main (contexto de posicionamiento del indicator).
- * getBoundingClientRect garantiza precisión tras cualquier reflow/relayout.
- */
+// ─── COORDENADAS — position:fixed, coordenadas de viewport ────────────────────
+// Sin restar ningún ancestro: getBoundingClientRect() ya da coordenadas de viewport.
+// Esto elimina cualquier dependencia de scroll, padding de .main o contexto de
+// posicionamiento intermedio.
 export function lgGetBtnRect(btn) {
-  const main = document.querySelector('.main');
-  if (!main || !btn) return { left: 0, top: 0, width: 0, height: 0 };
-
-  const rb = btn.getBoundingClientRect();
-  const rm = main.getBoundingClientRect();
-
-  return {
-    left:   rb.left - rm.left,
-    top:    rb.top  - rm.top,
-    width:  rb.width,
-    height: rb.height,
-  };
+  if (!btn) return { left: 0, top: 0, width: 0, height: 0 };
+  const r = btn.getBoundingClientRect();
+  return { left: r.left, top: r.top, width: r.width, height: r.height };
 }
 
 // ─── COLOR ─────────────────────────────────────────────────────────────────────
-/** Interpola linealmente entre dos colores rgba en t (0..1) */
 export function lgLerpColor(from, to, t) {
   const parse = s => (s.match(/[\d.]+/g) || []).map(Number);
   const [r1=0,g1=0,b1=0,a1=0] = parse(from);
@@ -61,20 +49,17 @@ export function lgApplyColor(bg, border) {
 
 export function lgReadCurrentBg() {
   if (!lgIndicator) return 'rgba(200,240,96,0.32)';
-  return lgIndicator.style.background || getComputedStyle(lgIndicator).backgroundColor || 'rgba(200,240,96,0.32)';
+  return lgIndicator.style.background || 'rgba(200,240,96,0.32)';
 }
 
 export function lgReadCurrentBorder() {
   if (!lgIndicator) return 'rgba(200,240,96,0.35)';
-  return lgIndicator.style.borderColor || getComputedStyle(lgIndicator).borderTopColor || 'rgba(200,240,96,0.35)';
+  return lgIndicator.style.borderColor || 'rgba(200,240,96,0.35)';
 }
 
-// ─── RESOLUCIÓN DE COLOR DESTINO ───────────────────────────────────────────────
-/**
- * Resuelve el color destino a partir del nombre de categoría del botón.
- * Se llama en el momento de ejecutar (no al schedulear) para garantizar
- * que catColors ya tenga el color asignado (listas recién creadas).
- */
+// ─── COLOR DESTINO ─────────────────────────────────────────────────────────────
+// Se resuelve en el momento de ejecutar — nunca al schedulear —
+// para garantizar que catColors ya tenga el valor (listas recién creadas).
 function lgResolveColor(btn) {
   const catName = btn?.dataset?.cat;
   if (catName && catColors[catName]) {
@@ -84,142 +69,111 @@ function lgResolveColor(btn) {
     );
     return { bg, border: catColors[catName].border };
   }
-  // "Tareas de hoy" u otro sin color asignado
-  return {
-    bg:     'rgba(200, 240, 96, 0.32)',
-    border: 'rgba(200, 240, 96, 0.35)',
-  };
+  return { bg: 'rgba(200,240,96,0.32)', border: 'rgba(200,240,96,0.35)' };
 }
 
-// ─── MOVIMIENTO ────────────────────────────────────────────────────────────────
-/**
- * Mueve el indicador al botón destino.
- *
- * Diseño de la animación:
- *   - El indicator viaja con su tamaño actual usando transform translate.
- *   - Al llegar hace un bounce de escala (1 → 1.06 → 0.97 → 1) — sin
- *     modificar width/height, lo que eliminaba el "squish" del tamaño.
- *   - El color interpola suavemente durante el viaje.
- *   - Primera vez: posicionamiento directo sin animación.
- */
-export function lgMoveTo(activeBtn) {
-  if (!lgIndicator || !activeBtn) return;
-
-  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const { bg: destBg, border: destBorder } = lgResolveColor(activeBtn);
-
-  // Forzar reflow para que getBoundingClientRect sea preciso
-  void lgIndicator.offsetHeight;
-
-  const rect = lgGetBtnRect(activeBtn);
-  if (!rect.width || !rect.height) return;
-
-  // ── Primera vez: aparecer directo en posición ──────────────────────────────
-  if (!lgInitDone) {
-    lgApplyColor(destBg, destBorder);
-    Object.assign(lgIndicator.style, {
-      left:      rect.left   + 'px',
-      top:       rect.top    + 'px',
-      width:     rect.width  + 'px',
-      height:    rect.height + 'px',
-      opacity:   '1',
-      transform: 'none',
-    });
-    lgCurrentBtn = activeBtn;
-    lgInitDone   = true;
-    return;
-  }
-
-  if (lgCurrentBtn === activeBtn) return;
-
-  // ── Cancelar animación previa si la hay ────────────────────────────────────
-  if (lgCurrentAnim) {
-    lgCurrentAnim.cancel();
-    lgCurrentAnim = null;
-    // Commit estado actual al estilo inline para que la nueva animación
-    // parta de donde realmente está
-    lgIndicator.style.transform = 'none';
-  }
-
-  // ── Modo reducido: salto instantáneo ──────────────────────────────────────
-  if (prefersReduced) {
-    lgApplyColor(destBg, destBorder);
-    Object.assign(lgIndicator.style, {
-      left:      rect.left   + 'px',
-      top:       rect.top    + 'px',
-      width:     rect.width  + 'px',
-      height:    rect.height + 'px',
-      transform: 'none',
-    });
-    lgCurrentBtn = activeBtn;
-    return;
-  }
-
-  // ── Animación normal ───────────────────────────────────────────────────────
-  const fromBg     = lgReadCurrentBg();
-  const fromBorder = lgReadCurrentBorder();
-
-  // Posición actual del indicator (desde donde parte)
-  const fromLeft = parseFloat(lgIndicator.style.left) || 0;
-  const fromTop  = parseFloat(lgIndicator.style.top)  || 0;
-
-  // Distancia a recorrer (usada para el translate inicial que "simula" estar en origen)
-  const dx = fromLeft - rect.left;
-  const dy = fromTop  - rect.top;
-
-  // Mover el indicator al destino en CSS — la animación lo compensa con translate
+// ─── POSICIONAR INDICATOR EN UN BOTÓN ─────────────────────────────────────────
+// Escribe left/top/width/height directamente desde el rect del botón.
+function lgApplyRect(rect) {
   Object.assign(lgIndicator.style, {
     left:   rect.left   + 'px',
     top:    rect.top    + 'px',
     width:  rect.width  + 'px',
     height: rect.height + 'px',
   });
+}
 
+// ─── MOVIMIENTO ────────────────────────────────────────────────────────────────
+export function lgMoveTo(activeBtn) {
+  if (!lgIndicator || !activeBtn) return;
+
+  const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const { bg: destBg, border: destBorder } = lgResolveColor(activeBtn);
+
+  const rect = lgGetBtnRect(activeBtn);
+  if (!rect.width || !rect.height) return;
+
+  // ── Primera vez o reset forzado: aparecer directo sin animación ──────────────
+  if (!lgInitDone) {
+    lgApplyColor(destBg, destBorder);
+    lgApplyRect(rect);
+    lgIndicator.style.opacity   = '1';
+    lgIndicator.style.transform = 'none';
+    lgCurrentBtn = activeBtn;
+    lgInitDone   = true;
+    return;
+  }
+
+  // Mismo botón: no hacer nada
+  if (lgCurrentBtn === activeBtn) return;
+
+  // Cancelar animación previa
+  if (lgCurrentAnim) {
+    lgCurrentAnim.cancel();
+    lgCurrentAnim = null;
+  }
+  lgIndicator.style.transform = 'none';
+
+  // ── Modo reducido: salto instantáneo ──────────────────────────────────────
+  if (prefersReduced) {
+    lgApplyColor(destBg, destBorder);
+    lgApplyRect(rect);
+    lgCurrentBtn = activeBtn;
+    return;
+  }
+
+  // ── Animación: translate desde posición actual → destino ──────────────────
+  const fromBg     = lgReadCurrentBg();
+  const fromBorder = lgReadCurrentBorder();
+  const fromLeft   = parseFloat(lgIndicator.style.left) || rect.left;
+  const fromTop    = parseFloat(lgIndicator.style.top)  || rect.top;
+  const fromWidth  = parseFloat(lgIndicator.style.width)  || rect.width;
+  const fromHeight = parseFloat(lgIndicator.style.height) || rect.height;
+
+  const dx = fromLeft - rect.left;
+  const dy = fromTop  - rect.top;
+
+  // Mover el indicador al destino — la animación lo compensa con translate
+  lgApplyRect(rect);
   lgCurrentBtn = activeBtn;
 
-  const DUR = 480; // ms — más corto = más snappy, menos feo
+  const DUR = 420;
 
-  // Easing personalizado para el viaje: arranca rápido, llega suave + bounce
-  const keyframes = [
+  const anim = lgIndicator.animate([
     {
       transform: `translate(${dx}px, ${dy}px) scale(1)`,
-      offset:    0,
-      easing:    'cubic-bezier(0.32, 0, 0.16, 1)',
+      width:  fromWidth  + 'px',
+      height: fromHeight + 'px',
+      offset: 0,
+      easing: 'cubic-bezier(0.28, 0, 0.12, 1)',
     },
     {
-      // 70% del viaje completado: escala normal
-      transform: `translate(${dx * 0.08}px, ${dy * 0.08}px) scale(1)`,
-      offset:    0.70,
-      easing:    'cubic-bezier(0.34, 1.4, 0.64, 1)',
+      transform: `translate(0px, 0px) scale(1.048)`,
+      width:  rect.width  + 'px',
+      height: rect.height + 'px',
+      offset: 0.82,
+      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // Bounce de llegada: leve expansión
-      transform: `translate(0px, 0px) scale(1.055)`,
-      offset:    0.84,
-      easing:    'cubic-bezier(0.25, 0.8, 0.25, 1)',
+      transform: `translate(0px, 0px) scale(0.982)`,
+      width:  rect.width  + 'px',
+      height: rect.height + 'px',
+      offset: 0.92,
+      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // Retracción
-      transform: `translate(0px, 0px) scale(0.978)`,
-      offset:    0.93,
-      easing:    'cubic-bezier(0.25, 0.8, 0.25, 1)',
-    },
-    {
-      // Settle final
       transform: `translate(0px, 0px) scale(1)`,
-      offset:    1.00,
+      width:  rect.width  + 'px',
+      height: rect.height + 'px',
+      offset: 1.00,
     },
-  ];
+  ], { duration: DUR, fill: 'none' });
 
-  const anim = lgIndicator.animate(keyframes, {
-    duration: DUR,
-    fill:     'none',
-  });
   lgCurrentAnim = anim;
 
-  // Interpolación de color en rAF — independiente de la animación de transform
-  const midBg     = 'rgba(255, 255, 255, 0.16)';
-  const midBorder = 'rgba(255, 255, 255, 0.38)';
+  // Interpolación de color independiente
+  const midBg     = 'rgba(255,255,255,0.16)';
+  const midBorder = 'rgba(255,255,255,0.38)';
   const startTime = performance.now();
 
   function colorFrame(now) {
@@ -229,15 +183,14 @@ export function lgMoveTo(activeBtn) {
     }
     const t = Math.min((now - startTime) / DUR, 1);
     let bg, border;
-    if (t < 0.40) {
-      const p = t / 0.40;
+    if (t < 0.4) {
+      const p = t / 0.4;
       bg     = lgLerpColor(fromBg,     midBg,     p);
       border = lgLerpColor(fromBorder, midBorder, p);
-    } else if (t < 0.60) {
-      bg     = midBg;
-      border = midBorder;
+    } else if (t < 0.6) {
+      bg = midBg; border = midBorder;
     } else {
-      const p = (t - 0.60) / 0.40;
+      const p = (t - 0.6) / 0.4;
       bg     = lgLerpColor(midBg,     destBg,     p);
       border = lgLerpColor(midBorder, destBorder, p);
     }
@@ -250,9 +203,9 @@ export function lgMoveTo(activeBtn) {
   anim.onfinish = () => {
     if (lgCurrentAnim === anim) lgCurrentAnim = null;
     lgApplyColor(destBg, destBorder);
-    Object.assign(lgIndicator.style, {
-      transform: 'none',
-    });
+    lgIndicator.style.transform = 'none';
+    lgIndicator.style.width     = rect.width  + 'px';
+    lgIndicator.style.height    = rect.height + 'px';
   };
 
   anim.oncancel = () => {
@@ -261,10 +214,6 @@ export function lgMoveTo(activeBtn) {
 }
 
 // ─── SYNC CON BOTÓN ACTIVO ─────────────────────────────────────────────────────
-/**
- * Busca el botón activo en el cat-bar y mueve el indicator a él.
- * Siempre seguro de llamar aunque el layout haya cambiado.
- */
 export function lgSyncWithActiveBtn() {
   if (lgSwitching) return;
   const catBar = document.getElementById('cat-bar');
@@ -285,18 +234,35 @@ export function lgSyncWithActiveBtn() {
   lgMoveTo(activeBtn);
 }
 
-// ─── RESIZE OBSERVER ───────────────────────────────────────────────────────────
+// ─── RESIZE / SCROLL ───────────────────────────────────────────────────────────
+// Con position:fixed el indicator se desincroniza si la página scrollea o
+// cambia de tamaño. El ResizeObserver lo resincroniza.
 const lgResizeObserver = new ResizeObserver(() => {
   if (!lgInitDone) return;
-  // Forzar reposicionamiento limpio al cambiar tamaño
   lgInitDone   = false;
   lgCurrentBtn = null;
   setTimeout(lgSyncWithActiveBtn, 50);
 });
 
+// También resincronizar en scroll — el indicator es fixed pero el cat-bar
+// está en el flujo normal del documento (aunque la topbar es sticky).
+function lgOnScroll() {
+  if (!lgInitDone || !lgCurrentBtn) return;
+  const rect = lgGetBtnRect(lgCurrentBtn);
+  if (!rect.width) return;
+  Object.assign(lgIndicator.style, {
+    left: rect.left + 'px',
+    top:  rect.top  + 'px',
+  });
+}
+
 export function lgStartObserving() {
   const catBar = document.getElementById('cat-bar');
   if (catBar) lgResizeObserver.observe(catBar);
+
+  // Scroll listener — pasivo para no bloquear el hilo principal
+  window.addEventListener('scroll', lgOnScroll, { passive: true });
+
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
       lgInitDone   = false;

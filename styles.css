@@ -1483,7 +1483,7 @@ body {
   pointer-events: none;
 }
 
-/* .main necesita position:relative — el indicador es absolute relativo a él */
+
 .main {
   position: relative;
 }
@@ -1497,12 +1497,12 @@ body {
 */
 
 #lg-indicator {
-  position: absolute;
+  position: fixed;
   top: 0; left: 0;
   width: 0; height: 0;
   border-radius: 20px;
   pointer-events: none;
-  z-index: 10;
+  z-index: 150;
   opacity: 0;
   will-change: transform;
   overflow: hidden;
@@ -1566,12 +1566,12 @@ body {
 .cat-bar .new-cat-btn,
 .cat-bar .global-search-btn {
   position: relative;
-  z-index: 11;
+  z-index: 160;
 }
 
 /* Botón activo: siempre encima del glass para que su texto sea visible */
 .cat-bar .cat-btn.active {
-  z-index: 13;
+  z-index: 170;
 }
 
 /* Botón activo: pierde su fondo (el glass lo reemplaza) */
@@ -1587,12 +1587,12 @@ body {
 
 /* ─── LIQUID GLASS PREVIEW (hover) ─────────────────────────────────────── */
 #lg-preview {
-  position: absolute;
+  position: fixed;
   top: 0; left: 0;
   width: 0; height: 0;
   border-radius: 20px;
   pointer-events: none;
-  z-index: 9;
+  z-index: 140;
   opacity: 0;
   overflow: hidden;
   backdrop-filter: blur(8px) saturate(1.3);
