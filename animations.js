@@ -4,37 +4,39 @@
 import { catColors } from './storage.js';
 
 // ─── LIQUID GLASS — estado ─────────────────────────────────────────────────────
-// Declarados en este módulo, exportados para que app.js y otros los lean/escriban.
 export const lgIndicator = document.getElementById('lg-indicator');
 export const lgPreview   = document.getElementById('lg-preview');
 
-export let lgCurrentBtn  = null;
-export let lgInitDone    = false;
-export let lgCurrentAnim = null;
-export let lgSwitching   = false;
+export let lgCurrentBtn    = null;
+export let lgInitDone      = false;
+export let lgCurrentAnim   = null;
+export let lgSwitching     = false;
 export let lgPreviewActive = false;
 
 // Setters — necesarios porque ES modules no permiten asignar exports desde afuera
-export function setLgCurrentBtn(v)    { lgCurrentBtn  = v; }
-export function setLgInitDone(v)      { lgInitDone    = v; }
-export function setLgCurrentAnim(v)   { lgCurrentAnim = v; }
-export function setLgSwitching(v)     { lgSwitching   = v; }
+export function setLgCurrentBtn(v)    { lgCurrentBtn    = v; }
+export function setLgInitDone(v)      { lgInitDone      = v; }
+export function setLgCurrentAnim(v)   { lgCurrentAnim   = v; }
+export function setLgSwitching(v)     { lgSwitching     = v; }
 export function setLgPreviewActive(v) { lgPreviewActive = v; }
 
 // ─── COORDENADAS ───────────────────────────────────────────────────────────────
 /**
- * Coordenadas del botón relativas a .main (ancestro con position:relative).
- * Inset de 1px en cada lado para evitar desborde subpíxel.
+ * Coordenadas del botón relativas a .main (contexto de posicionamiento del indicator).
+ * getBoundingClientRect garantiza precisión tras cualquier reflow/relayout.
  */
 export function lgGetBtnRect(btn) {
   const main = document.querySelector('.main');
-  const rb   = btn.getBoundingClientRect();
-  const rm   = main ? main.getBoundingClientRect() : { left: 0, top: 0 };
+  if (!main || !btn) return { left: 0, top: 0, width: 0, height: 0 };
+
+  const rb = btn.getBoundingClientRect();
+  const rm = main.getBoundingClientRect();
+
   return {
-    left:   rb.left - rm.left + 1,
-    top:    rb.top  - rm.top  + 1,
-    width:  rb.width  - 2,
-    height: rb.height - 2,
+    left:   rb.left - rm.left,
+    top:    rb.top  - rm.top,
+    width:  rb.width,
+    height: rb.height,
   };
 }
 
@@ -52,45 +54,77 @@ export function lgLerpColor(from, to, t) {
 }
 
 export function lgApplyColor(bg, border) {
+  if (!lgIndicator) return;
   lgIndicator.style.background  = bg;
   lgIndicator.style.borderColor = border;
-  lgIndicator.style.boxShadow   = '0 2px 10px rgba(0,0,0,0.35)';
 }
 
 export function lgReadCurrentBg() {
-  return getComputedStyle(lgIndicator).backgroundColor || 'rgba(200,240,96,0.32)';
+  if (!lgIndicator) return 'rgba(200,240,96,0.32)';
+  return lgIndicator.style.background || getComputedStyle(lgIndicator).backgroundColor || 'rgba(200,240,96,0.32)';
 }
 
 export function lgReadCurrentBorder() {
-  return getComputedStyle(lgIndicator).borderTopColor || 'rgba(200,240,96,0.35)';
+  if (!lgIndicator) return 'rgba(200,240,96,0.35)';
+  return lgIndicator.style.borderColor || getComputedStyle(lgIndicator).borderTopColor || 'rgba(200,240,96,0.35)';
+}
+
+// ─── RESOLUCIÓN DE COLOR DESTINO ───────────────────────────────────────────────
+/**
+ * Resuelve el color destino a partir del nombre de categoría del botón.
+ * Se llama en el momento de ejecutar (no al schedulear) para garantizar
+ * que catColors ya tenga el color asignado (listas recién creadas).
+ */
+function lgResolveColor(btn) {
+  const catName = btn?.dataset?.cat;
+  if (catName && catColors[catName]) {
+    const raw = catColors[catName].bg;
+    const bg  = raw.replace(/([.\d]+)\)$/, (_, v) =>
+      `${Math.min(parseFloat(v) * 2.5, 0.38)})`
+    );
+    return { bg, border: catColors[catName].border };
+  }
+  // "Tareas de hoy" u otro sin color asignado
+  return {
+    bg:     'rgba(200, 240, 96, 0.32)',
+    border: 'rgba(200, 240, 96, 0.35)',
+  };
 }
 
 // ─── MOVIMIENTO ────────────────────────────────────────────────────────────────
 /**
  * Mueve el indicador al botón destino.
- * Primera vez: aparece directo sin animación.
- * Siguientes: expand → squish+travel → impact+expand → settle.
+ *
+ * Diseño de la animación:
+ *   - El indicator viaja con su tamaño actual usando transform translate.
+ *   - Al llegar hace un bounce de escala (1 → 1.06 → 0.97 → 1) — sin
+ *     modificar width/height, lo que eliminaba el "squish" del tamaño.
+ *   - El color interpola suavemente durante el viaje.
+ *   - Primera vez: posicionamiento directo sin animación.
  */
-export function lgMoveTo(activeBtn, destBg, destBorder) {
+export function lgMoveTo(activeBtn) {
   if (!lgIndicator || !activeBtn) return;
 
-  const catBar = document.getElementById('cat-bar');
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const { bg: destBg, border: destBorder } = lgResolveColor(activeBtn);
 
-  void catBar.offsetHeight;
+  // Forzar reflow para que getBoundingClientRect sea preciso
+  void lgIndicator.offsetHeight;
+
   const rect = lgGetBtnRect(activeBtn);
+  if (!rect.width || !rect.height) return;
 
+  // ── Primera vez: aparecer directo en posición ──────────────────────────────
   if (!lgInitDone) {
     lgApplyColor(destBg, destBorder);
     Object.assign(lgIndicator.style, {
-      left:    rect.left   + 'px',
-      top:     rect.top    + 'px',
-      width:   rect.width  + 'px',
-      height:  rect.height + 'px',
-      opacity: '1',
+      left:      rect.left   + 'px',
+      top:       rect.top    + 'px',
+      width:     rect.width  + 'px',
+      height:    rect.height + 'px',
+      opacity:   '1',
       transform: 'none',
     });
-    catBar.classList.add('lg-active');
     lgCurrentBtn = activeBtn;
     lgInitDone   = true;
     return;
@@ -98,108 +132,94 @@ export function lgMoveTo(activeBtn, destBg, destBorder) {
 
   if (lgCurrentBtn === activeBtn) return;
 
+  // ── Cancelar animación previa si la hay ────────────────────────────────────
+  if (lgCurrentAnim) {
+    lgCurrentAnim.cancel();
+    lgCurrentAnim = null;
+    // Commit estado actual al estilo inline para que la nueva animación
+    // parta de donde realmente está
+    lgIndicator.style.transform = 'none';
+  }
+
+  // ── Modo reducido: salto instantáneo ──────────────────────────────────────
   if (prefersReduced) {
     lgApplyColor(destBg, destBorder);
     Object.assign(lgIndicator.style, {
-      left:   rect.left   + 'px',
-      top:    rect.top    + 'px',
-      width:  rect.width  + 'px',
-      height: rect.height + 'px',
+      left:      rect.left   + 'px',
+      top:       rect.top    + 'px',
+      width:     rect.width  + 'px',
+      height:    rect.height + 'px',
       transform: 'none',
     });
     lgCurrentBtn = activeBtn;
     return;
   }
 
-  if (lgCurrentAnim) {
-    lgCurrentAnim.cancel();
-    lgCurrentAnim = null;
-  }
-
+  // ── Animación normal ───────────────────────────────────────────────────────
   const fromBg     = lgReadCurrentBg();
   const fromBorder = lgReadCurrentBorder();
-  const fromLeft   = parseFloat(lgIndicator.style.left) || 0;
-  const fromTop    = parseFloat(lgIndicator.style.top)  || 0;
+
+  // Posición actual del indicator (desde donde parte)
+  const fromLeft = parseFloat(lgIndicator.style.left) || 0;
+  const fromTop  = parseFloat(lgIndicator.style.top)  || 0;
+
+  // Distancia a recorrer (usada para el translate inicial que "simula" estar en origen)
+  const dx = fromLeft - rect.left;
+  const dy = fromTop  - rect.top;
+
+  // Mover el indicator al destino en CSS — la animación lo compensa con translate
+  Object.assign(lgIndicator.style, {
+    left:   rect.left   + 'px',
+    top:    rect.top    + 'px',
+    width:  rect.width  + 'px',
+    height: rect.height + 'px',
+  });
 
   lgCurrentBtn = activeBtn;
 
-  const DUR        = 900;
-  const fromWidth  = parseFloat(lgIndicator.style.width)  || rect.width;
-  const fromHeight = parseFloat(lgIndicator.style.height) || rect.height;
+  const DUR = 480; // ms — más corto = más snappy, menos feo
 
-  Object.assign(lgIndicator.style, {
-    left: rect.left + 'px',
-    top:  rect.top  + 'px',
-  });
-
-  const dLeft = rect.left - fromLeft;
-  const dTop  = rect.top  - fromTop;
-
-  const midW = (fromWidth  + rect.width)  / 2 * 0.72;
-  const midH = (fromHeight + rect.height) / 2 * 0.72;
-
+  // Easing personalizado para el viaje: arranca rápido, llega suave + bounce
   const keyframes = [
     {
-      transform: `translate(${-dLeft}px, ${-dTop}px)`,
-      width:  fromWidth  + 'px',
-      height: fromHeight + 'px',
-      offset: 0,
-      easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
+      transform: `translate(${dx}px, ${dy}px) scale(1)`,
+      offset:    0,
+      easing:    'cubic-bezier(0.32, 0, 0.16, 1)',
     },
     {
-      transform: `translate(${-dLeft}px, ${-dTop}px)`,
-      width:  midW + 'px',
-      height: midH + 'px',
-      offset: 0.18,
-      easing: 'cubic-bezier(0.4, 0, 0.2, 1)',
+      // 70% del viaje completado: escala normal
+      transform: `translate(${dx * 0.08}px, ${dy * 0.08}px) scale(1)`,
+      offset:    0.70,
+      easing:    'cubic-bezier(0.34, 1.4, 0.64, 1)',
     },
     {
-      transform: `translate(${-dLeft * 0.42}px, ${-dTop * 0.42}px)`,
-      width:  midW + 'px',
-      height: midH + 'px',
-      offset: 0.42,
-      easing: 'cubic-bezier(0.2, 0, 0.4, 1)',
+      // Bounce de llegada: leve expansión
+      transform: `translate(0px, 0px) scale(1.055)`,
+      offset:    0.84,
+      easing:    'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      transform: `translate(0px, 0px)`,
-      width:  rect.width  + 'px',
-      height: rect.height + 'px',
-      offset: 0.65,
-      easing: 'cubic-bezier(0.34, 1.5, 0.64, 1)',
+      // Retracción
+      transform: `translate(0px, 0px) scale(0.978)`,
+      offset:    0.93,
+      easing:    'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      transform: `translate(0px, 0px)`,
-      width:  (rect.width  * 1.10) + 'px',
-      height: (rect.height * 1.10) + 'px',
-      offset: 0.78,
-      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
-    },
-    {
-      transform: `translate(0px, 0px)`,
-      width:  (rect.width  * 0.98) + 'px',
-      height: (rect.height * 0.98) + 'px',
-      offset: 0.90,
-      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
-    },
-    {
-      transform: `translate(0px, 0px)`,
-      width:  rect.width  + 'px',
-      height: rect.height + 'px',
-      offset: 1.00,
+      // Settle final
+      transform: `translate(0px, 0px) scale(1)`,
+      offset:    1.00,
     },
   ];
 
-  lgIndicator.style.zIndex = '12';
-
   const anim = lgIndicator.animate(keyframes, {
     duration: DUR,
-    easing:   'ease-in-out',
     fill:     'none',
   });
   lgCurrentAnim = anim;
 
-  const midBg     = 'rgba(255, 255, 255, 0.18)';
-  const midBorder = 'rgba(255, 255, 255, 0.40)';
+  // Interpolación de color en rAF — independiente de la animación de transform
+  const midBg     = 'rgba(255, 255, 255, 0.16)';
+  const midBorder = 'rgba(255, 255, 255, 0.38)';
   const startTime = performance.now();
 
   function colorFrame(now) {
@@ -209,15 +229,15 @@ export function lgMoveTo(activeBtn, destBg, destBorder) {
     }
     const t = Math.min((now - startTime) / DUR, 1);
     let bg, border;
-    if (t < 0.35) {
-      const p = t / 0.35;
+    if (t < 0.40) {
+      const p = t / 0.40;
       bg     = lgLerpColor(fromBg,     midBg,     p);
       border = lgLerpColor(fromBorder, midBorder, p);
-    } else if (t < 0.65) {
+    } else if (t < 0.60) {
       bg     = midBg;
       border = midBorder;
     } else {
-      const p = (t - 0.65) / 0.35;
+      const p = (t - 0.60) / 0.40;
       bg     = lgLerpColor(midBg,     destBg,     p);
       border = lgLerpColor(midBorder, destBorder, p);
     }
@@ -232,18 +252,19 @@ export function lgMoveTo(activeBtn, destBg, destBorder) {
     lgApplyColor(destBg, destBorder);
     Object.assign(lgIndicator.style, {
       transform: 'none',
-      width:     rect.width  + 'px',
-      height:    rect.height + 'px',
-      zIndex:    '10',
     });
   };
+
   anim.oncancel = () => {
     lgIndicator.style.transform = 'none';
-    lgIndicator.style.zIndex    = '10';
   };
 }
 
 // ─── SYNC CON BOTÓN ACTIVO ─────────────────────────────────────────────────────
+/**
+ * Busca el botón activo en el cat-bar y mueve el indicator a él.
+ * Siempre seguro de llamar aunque el layout haya cambiado.
+ */
 export function lgSyncWithActiveBtn() {
   if (lgSwitching) return;
   const catBar = document.getElementById('cat-bar');
@@ -252,32 +273,24 @@ export function lgSyncWithActiveBtn() {
   const activeBtn = catBar.querySelector('.cat-btn.active');
 
   if (!activeBtn) {
-    lgIndicator.style.opacity = '0';
+    if (lgIndicator) lgIndicator.style.opacity = '0';
     catBar.classList.remove('lg-active');
     lgCurrentBtn = null;
     lgInitDone   = false;
     return;
   }
 
-  let destBg, destBorder;
-  const catName = activeBtn.dataset.cat;
-  if (catName && catColors[catName]) {
-    const raw  = catColors[catName].bg;
-    destBg     = raw.replace(/([.\d]+)\)$/, (_, v) => `${Math.min(parseFloat(v) * 2.5, 0.38)})`);
-    destBorder = catColors[catName].border;
-  } else {
-    destBg     = 'rgba(200, 240, 96, 0.32)';
-    destBorder = 'rgba(200, 240, 96, 0.35)';
-  }
-
   catBar.classList.add('lg-active');
-  lgMoveTo(activeBtn, destBg, destBorder);
+  if (lgIndicator) lgIndicator.style.opacity = '1';
+  lgMoveTo(activeBtn);
 }
 
 // ─── RESIZE OBSERVER ───────────────────────────────────────────────────────────
 const lgResizeObserver = new ResizeObserver(() => {
   if (!lgInitDone) return;
-  lgInitDone = false;
+  // Forzar reposicionamiento limpio al cambiar tamaño
+  lgInitDone   = false;
+  lgCurrentBtn = null;
   setTimeout(lgSyncWithActiveBtn, 50);
 });
 
@@ -286,7 +299,8 @@ export function lgStartObserving() {
   if (catBar) lgResizeObserver.observe(catBar);
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
-      lgInitDone = false;
+      lgInitDone   = false;
+      lgCurrentBtn = null;
       setTimeout(lgSyncWithActiveBtn, 50);
     });
   }
