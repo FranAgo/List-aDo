@@ -182,37 +182,53 @@ export function lgMoveTo(activeBtn) {
   const ovY       = dist > 0 ? (dy / dist) * ovAmt : 0;
 
   // Ancho/alto intermedios: promedio entre origen y destino.
-  // El indicator ya tiene width=destW, así que el scaleX para mostrar midW es midW/destW.
-  // Mismo para Y. Esto hace que en la mitad del viaje la gota tenga el tamaño
-  // exactamente intermedio entre los dos botones — efecto de transición de masa real.
-  const midW   = (fromW + destRect.width)  / 2;
-  const midH   = (fromH + destRect.height) / 2;
-  const midSX  = destRect.width  > 0 ? midW / destRect.width  : 1;
-  const midSY  = destRect.height > 0 ? midH / destRect.height : 1;
+  const midW  = (fromW + destRect.width)  / 2;
+  const midH  = (fromH + destRect.height) / 2;
+  const midSX = destRect.width  > 0 ? midW / destRect.width  : 1;
+  const midSY = destRect.height > 0 ? midH / destRect.height : 1;
 
-  const DUR = 500;
+  const DUR = 560;
 
+  // Física de slime/gelatina — 5 fases:
+  //   t=0.00 → escala 1 (estado actual)
+  //   t=0.12 → se AGRANDA antes de salir (toma impulso, como slime que se tensa)
+  //   t=0.46 → tamaño intermedio en la mitad del viaje (se afina al viajar)
+  //   t=0.72 → IMPACTO al llegar: se agranda bruscamente (slime que cae)
+  //   t=0.88 → rebote inverso: se achica ligeramente (la onda vuelve)
+  //   t=1.00 → asentamiento en tamaño correcto
   const anim = lgIndicator.animate([
     {
-      // t=0: comprimida uniformemente — tapa el reposicionamiento inicial
-      transform: 'translate(0px, 0px) scale(0.86)',
+      // Estado inicial comprimido — tapa el cambio de tamaño al fijarse en destW
+      transform: 'translate(0px, 0px) scale(0.88)',
       offset: 0,
-      easing: 'cubic-bezier(0.12, 0, 0.0, 1)',
+      easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
     },
     {
-      // t=0.46: tamaño intermedio real entre fromW y destW en la mitad del viaje
+      // Impulso de salida: se agranda (como slime que se tensa antes de soltarse)
+      transform: 'translate(0px, 0px) scaleX(1.18) scaleY(0.88)',
+      offset: 0.12,
+      easing: 'cubic-bezier(0.4, 0, 0.0, 1)',
+    },
+    {
+      // Mitad del viaje: tamaño intermedio real entre fromW y destW
       transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,
       offset: 0.46,
       easing: 'cubic-bezier(0.0, 0, 0.08, 1)',
     },
     {
-      // t=0.76: llegó — overshoot leve de expansión
-      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.06) scaleY(0.96)`,
-      offset: 0.76,
+      // Impacto: llega y se aplasta/expande como slime que cae sobre superficie
+      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.14) scaleY(0.88)`,
+      offset: 0.72,
       easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // t=1: asentada en escala 1 exacta (= tamaño destino correcto)
+      // Rebote: la onda vuelve, se achica ligeramente en X y crece en Y
+      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(0.94) scaleY(1.06)`,
+      offset: 0.88,
+      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+    },
+    {
+      // Asentamiento final
       transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,
       offset: 1.00,
     },
@@ -227,8 +243,9 @@ export function lgMoveTo(activeBtn) {
   // lgRefraction: misma trayectoria, sin rebote de escala
   if (lgRefraction) {
     const refrAnim = lgRefraction.animate([
-      { transform: 'translate(0px, 0px) scale(0.86)',                                                                                                          offset: 0,    easing: 'cubic-bezier(0.12, 0, 0.0, 1)' },
-      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,               offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)'  },
+      { transform: 'translate(0px, 0px) scale(0.88)',                                                                                                            offset: 0,    easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
+      { transform: 'translate(0px, 0px) scaleX(1.18) scaleY(0.88)',                                                                                           offset: 0.12, easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
+      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,               offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)' },
       { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                                               offset: 1.00 },
     ], { duration: DUR, fill: 'none' });
 
