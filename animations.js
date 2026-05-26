@@ -181,35 +181,40 @@ export function lgMoveTo(activeBtn) {
   const ovX       = dist > 0 ? (dx / dist) * ovAmt : 0;
   const ovY       = dist > 0 ? (dy / dist) * ovAmt : 0;
 
-  // Elongación: solo en el eje del movimiento, relativa a 1 (no al ratio de tamaño)
-  const elongSX = isHorizontal ? 1.14 : 0.90;
-  const elongSY = isHorizontal ? 0.90 : 1.14;
+  // Elongación durante el viaje: la gota se aprieta en el eje perpendicular al movimiento
+  // (como una gota de agua siendo presionada y deslizándose).
+  // scaleX/Y del viaje son independientes del tamaño destino — siempre relativos a 1.
+  // Al llegar, se expande al ancho correcto con un overshoot de expansión.
+  const travelSX = isHorizontal ? 0.58 : 1.10;  // horizontal: angosta; vertical: alta
+  const travelSY = isHorizontal ? 1.10 : 0.58;  // eje perpendicular: se expande
 
-  const DUR = 480;
+  const DUR = 500;
 
-  // Keyframes: scaleX/Y siempre relativo a 1 (el indicator ya está en tamaño destino).
-  // translate lleva de fromX/fromY → destX/destY con overshoot físico.
+  // Keyframes:
+  //   t=0.00 — comprimida uniformemente (tapa el reposicionamiento inicial)
+  //   t=0.46 — mitad del viaje: apretada en el eje perpendicular al movimiento
+  //   t=0.76 — llegó + overshoot de expansión (más ancha que el destino)
+  //   t=1.00 — asentada en escala 1 exacta
   const anim = lgIndicator.animate([
     {
-      // Origen: comprimido. La compresión tapa el cambio de tamaño/posición de arriba.
       transform: 'translate(0px, 0px) scale(0.86)',
       offset: 0,
       easing: 'cubic-bezier(0.12, 0, 0.0, 1)',
     },
     {
-      // Mitad del viaje: elongado en la dirección del movimiento
-      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX}) scaleY(${elongSY})`,
+      // Mitad del viaje: gota apretada → parece que se "desliza" con masa
+      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${travelSX}) scaleY(${travelSY})`,
       offset: 0.46,
-      easing: 'cubic-bezier(0.0, 0, 0.1, 1)',
+      easing: 'cubic-bezier(0.0, 0, 0.08, 1)',
     },
     {
-      // Overshoot: se pasa del destino
-      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.04) scaleY(0.96)`,
+      // Llegada + overshoot de expansión: la gota se expande más de lo necesario
+      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.12) scaleY(0.92)`,
       offset: 0.76,
-      easing: 'cubic-bezier(0.3, 0, 0.3, 1)',
+      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // Asentamiento: posición y escala finales exactas
+      // Asentamiento: escala 1 exacta
       transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,
       offset: 1.00,
     },
@@ -224,9 +229,9 @@ export function lgMoveTo(activeBtn) {
   // lgRefraction: misma trayectoria, sin rebote de escala
   if (lgRefraction) {
     const refrAnim = lgRefraction.animate([
-      { transform: 'translate(0px, 0px) scale(0.86)',                                                                                          offset: 0,    easing: 'cubic-bezier(0.12, 0, 0.0, 1)' },
-      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX}) scaleY(${elongSY})`,                 offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.1, 1)'  },
-      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                               offset: 1.00 },
+      { transform: 'translate(0px, 0px) scale(0.86)',                                                                                                    offset: 0,    easing: 'cubic-bezier(0.12, 0, 0.0, 1)' },
+      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${travelSX}) scaleY(${travelSY})`,                         offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)'  },
+      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                                         offset: 1.00 },
     ], { duration: DUR, fill: 'none' });
 
     lgState.currentRefrAnim = refrAnim;
