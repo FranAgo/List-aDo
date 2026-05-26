@@ -181,40 +181,38 @@ export function lgMoveTo(activeBtn) {
   const ovX       = dist > 0 ? (dx / dist) * ovAmt : 0;
   const ovY       = dist > 0 ? (dy / dist) * ovAmt : 0;
 
-  // Elongación durante el viaje: la gota se aprieta en el eje perpendicular al movimiento
-  // (como una gota de agua siendo presionada y deslizándose).
-  // scaleX/Y del viaje son independientes del tamaño destino — siempre relativos a 1.
-  // Al llegar, se expande al ancho correcto con un overshoot de expansión.
-  const travelSX = isHorizontal ? 0.58 : 1.10;  // horizontal: angosta; vertical: alta
-  const travelSY = isHorizontal ? 1.10 : 0.58;  // eje perpendicular: se expande
+  // Ancho/alto intermedios: promedio entre origen y destino.
+  // El indicator ya tiene width=destW, así que el scaleX para mostrar midW es midW/destW.
+  // Mismo para Y. Esto hace que en la mitad del viaje la gota tenga el tamaño
+  // exactamente intermedio entre los dos botones — efecto de transición de masa real.
+  const midW   = (fromW + destRect.width)  / 2;
+  const midH   = (fromH + destRect.height) / 2;
+  const midSX  = destRect.width  > 0 ? midW / destRect.width  : 1;
+  const midSY  = destRect.height > 0 ? midH / destRect.height : 1;
 
   const DUR = 500;
 
-  // Keyframes:
-  //   t=0.00 — comprimida uniformemente (tapa el reposicionamiento inicial)
-  //   t=0.46 — mitad del viaje: apretada en el eje perpendicular al movimiento
-  //   t=0.76 — llegó + overshoot de expansión (más ancha que el destino)
-  //   t=1.00 — asentada en escala 1 exacta
   const anim = lgIndicator.animate([
     {
+      // t=0: comprimida uniformemente — tapa el reposicionamiento inicial
       transform: 'translate(0px, 0px) scale(0.86)',
       offset: 0,
       easing: 'cubic-bezier(0.12, 0, 0.0, 1)',
     },
     {
-      // Mitad del viaje: gota apretada → parece que se "desliza" con masa
-      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${travelSX}) scaleY(${travelSY})`,
+      // t=0.46: tamaño intermedio real entre fromW y destW en la mitad del viaje
+      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,
       offset: 0.46,
       easing: 'cubic-bezier(0.0, 0, 0.08, 1)',
     },
     {
-      // Llegada + overshoot de expansión: la gota se expande más de lo necesario
-      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.12) scaleY(0.92)`,
+      // t=0.76: llegó — overshoot leve de expansión
+      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.06) scaleY(0.96)`,
       offset: 0.76,
       easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // Asentamiento: escala 1 exacta
+      // t=1: asentada en escala 1 exacta (= tamaño destino correcto)
       transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,
       offset: 1.00,
     },
@@ -229,9 +227,9 @@ export function lgMoveTo(activeBtn) {
   // lgRefraction: misma trayectoria, sin rebote de escala
   if (lgRefraction) {
     const refrAnim = lgRefraction.animate([
-      { transform: 'translate(0px, 0px) scale(0.86)',                                                                                                    offset: 0,    easing: 'cubic-bezier(0.12, 0, 0.0, 1)' },
-      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${travelSX}) scaleY(${travelSY})`,                         offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)'  },
-      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                                         offset: 1.00 },
+      { transform: 'translate(0px, 0px) scale(0.86)',                                                                                                          offset: 0,    easing: 'cubic-bezier(0.12, 0, 0.0, 1)' },
+      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,               offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)'  },
+      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                                               offset: 1.00 },
     ], { duration: DUR, fill: 'none' });
 
     lgState.currentRefrAnim = refrAnim;
