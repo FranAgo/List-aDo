@@ -215,6 +215,10 @@ export function lgMoveTo(activeBtn) {
     },
   ], { duration: DUR, fill: 'none' });
 
+  // Elevar z-index durante el viaje para pasar siempre por encima de los botones
+  lgIndicator.style.zIndex = '20';
+  if (lgRefraction) lgRefraction.style.zIndex = '19';
+
   lgState.currentAnim = anim;
 
   // lgRefraction: misma trayectoria, sin rebote de escala
@@ -262,21 +266,25 @@ export function lgMoveTo(activeBtn) {
   anim.onfinish = () => {
     if (lgState.currentAnim === anim) lgState.currentAnim = null;
     applyColor(destBg, destBorder);
-    // El tamaño ya está correcto (se fijó al inicio del viaje).
-    // Solo actualizamos left/top y limpiamos transform.
     lgIndicator.style.left      = destRect.left + 'px';
     lgIndicator.style.top       = destRect.top  + 'px';
     lgIndicator.style.transform = 'none';
+    lgIndicator.style.zIndex    = '11';
     if (lgRefraction) {
       lgRefraction.style.left      = destRect.left + 'px';
       lgRefraction.style.top       = destRect.top  + 'px';
       lgRefraction.style.transform = 'none';
+      lgRefraction.style.zIndex    = '10';
     }
   };
 
   anim.oncancel = () => {
     lgIndicator.style.transform = 'none';
-    if (lgRefraction) lgRefraction.style.transform = 'none';
+    lgIndicator.style.zIndex    = '11';
+    if (lgRefraction) {
+      lgRefraction.style.transform = 'none';
+      lgRefraction.style.zIndex    = '10';
+    }
   };
 }
 
