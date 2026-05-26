@@ -8,8 +8,9 @@
 import { catColors } from './storage.js';
 
 // ─── ELEMENTOS DOM ─────────────────────────────────────────────────────────────
-export const lgIndicator = document.getElementById('lg-indicator');
-export const lgPreview   = document.getElementById('lg-preview');
+export const lgRefraction = document.getElementById('lg-refraction');
+export const lgIndicator  = document.getElementById('lg-indicator');
+export const lgPreview    = document.getElementById('lg-preview');
 
 // ─── ESTADO INTERNO ────────────────────────────────────────────────────────────
 // Un objeto mutable compartido por referencia. No hay setters: los módulos
@@ -78,24 +79,29 @@ function resolveColor(btn) {
   const catName = btn?.dataset?.cat;
   if (catName && catColors[catName]) {
     const raw = catColors[catName].bg;
-    // Amplificar ligeramente la opacidad del tinte para que sea visible
+    // Amplificar la opacidad para que el tinte sea visible sobre el fondo blanco del glass
     const bg = raw.replace(/([.\d]+)\)$/, (_, v) =>
-      `${Math.min(parseFloat(v) * 2.2, 0.32)})`
+      `${Math.min(parseFloat(v) * 3.5, 0.45)})`
     );
     return { bg, border: catColors[catName].border };
   }
   // Color por defecto: acento verde de la app
-  return { bg: 'rgba(200,240,96,0.18)', border: 'rgba(200,240,96,0.35)' };
+  return { bg: 'rgba(200,240,96,0.30)', border: 'rgba(200,240,96,0.55)' };
 }
 
 // ─── APLICAR POSICIÓN AL DOM ───────────────────────────────────────────────────
+// Ambos elementos (lgRefraction y lgIndicator) deben ocupar el mismo rect.
+// lgRefraction va PRIMERO en z-index (10) — backdrop-filter sin clip.
+// lgIndicator va ENCIMA (11) — tinte + borde + specular.
 function applyRect(rect) {
-  Object.assign(lgIndicator.style, {
+  const pos = {
     left:   rect.left   + 'px',
     top:    rect.top    + 'px',
     width:  rect.width  + 'px',
     height: rect.height + 'px',
-  });
+  };
+  if (lgRefraction) Object.assign(lgRefraction.style, pos);
+  Object.assign(lgIndicator.style, pos);
 }
 
 // ─── MOVIMIENTO PRINCIPAL ──────────────────────────────────────────────────────
@@ -112,6 +118,10 @@ export function lgMoveTo(activeBtn) {
     applyColor(destBg, destBorder);
     applyRect(rect);
     Object.assign(lgIndicator.style, {
+      opacity:   '1',
+      transform: 'none',
+    });
+    if (lgRefraction) Object.assign(lgRefraction.style, {
       opacity:   '1',
       transform: 'none',
     });
@@ -133,6 +143,7 @@ export function lgMoveTo(activeBtn) {
   if (prefersReduced) {
     applyColor(destBg, destBorder);
     applyRect(rect);
+    if (lgRefraction) lgRefraction.style.transform = 'none';
     lgState.currentBtn = activeBtn;
     return;
   }
@@ -213,10 +224,16 @@ export function lgMoveTo(activeBtn) {
     lgIndicator.style.transform = 'none';
     lgIndicator.style.width     = rect.width  + 'px';
     lgIndicator.style.height    = rect.height + 'px';
+    if (lgRefraction) {
+      lgRefraction.style.transform = 'none';
+      lgRefraction.style.width     = rect.width  + 'px';
+      lgRefraction.style.height    = rect.height + 'px';
+    }
   };
 
   anim.oncancel = () => {
-    lgIndicator.style.transform = 'none';
+    lgIndicator.style.transform  = 'none';
+    if (lgRefraction) lgRefraction.style.transform = 'none';
   };
 }
 
@@ -229,7 +246,8 @@ export function lgSyncWithActiveBtn() {
   const activeBtn = catBar.querySelector('.cat-btn.active');
 
   if (!activeBtn) {
-    if (lgIndicator) lgIndicator.style.opacity = '0';
+    if (lgIndicator)  lgIndicator.style.opacity  = '0';
+    if (lgRefraction) lgRefraction.style.opacity = '0';
     catBar.classList.remove('lg-active');
     lgState.currentBtn = null;
     lgState.initDone   = false;
@@ -237,7 +255,8 @@ export function lgSyncWithActiveBtn() {
   }
 
   catBar.classList.add('lg-active');
-  if (lgIndicator) lgIndicator.style.opacity = '1';
+  if (lgIndicator)  lgIndicator.style.opacity  = '1';
+  if (lgRefraction) lgRefraction.style.opacity = '1';
   lgMoveTo(activeBtn);
 }
 
