@@ -19,14 +19,18 @@ export function setLgCurrentAnim(v)   { lgCurrentAnim   = v; }
 export function setLgSwitching(v)     { lgSwitching     = v; }
 export function setLgPreviewActive(v) { lgPreviewActive = v; }
 
-// ─── COORDENADAS — position:fixed, coordenadas de viewport ────────────────────
-// Sin restar ningún ancestro: getBoundingClientRect() ya da coordenadas de viewport.
-// Esto elimina cualquier dependencia de scroll, padding de .main o contexto de
-// posicionamiento intermedio.
+// ─── COORDENADAS ───────────────────────────────────────────────────────────────
+// El indicator vive dentro de #cat-bar (position:relative).
+// offsetLeft/offsetTop dan la posición relativa al padre sin depender
+// del viewport, del scroll ni de ningún ancestro externo.
 export function lgGetBtnRect(btn) {
   if (!btn) return { left: 0, top: 0, width: 0, height: 0 };
-  const r = btn.getBoundingClientRect();
-  return { left: r.left, top: r.top, width: r.width, height: r.height };
+  return {
+    left:   btn.offsetLeft,
+    top:    btn.offsetTop,
+    width:  btn.offsetWidth,
+    height: btn.offsetHeight,
+  };
 }
 
 // ─── COLOR ─────────────────────────────────────────────────────────────────────
@@ -58,8 +62,6 @@ export function lgReadCurrentBorder() {
 }
 
 // ─── COLOR DESTINO ─────────────────────────────────────────────────────────────
-// Se resuelve en el momento de ejecutar — nunca al schedulear —
-// para garantizar que catColors ya tenga el valor (listas recién creadas).
 function lgResolveColor(btn) {
   const catName = btn?.dataset?.cat;
   if (catName && catColors[catName]) {
@@ -72,39 +74,31 @@ function lgResolveColor(btn) {
   return { bg: 'rgba(200,240,96,0.32)', border: 'rgba(200,240,96,0.35)' };
 }
 
-// ─── POSICIONAR INDICATOR EN UN BOTÓN ─────────────────────────────────────────
-// Escribe left/top/width/height directamente desde el rect del botón.
-function lgApplyRect(rect) {
-  Object.assign(lgIndicator.style, {
-    left:   rect.left   + 'px',
-    top:    rect.top    + 'px',
-    width:  rect.width  + 'px',
-    height: rect.height + 'px',
-  });
-}
-
 // ─── MOVIMIENTO ────────────────────────────────────────────────────────────────
 export function lgMoveTo(activeBtn) {
   if (!lgIndicator || !activeBtn) return;
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const { bg: destBg, border: destBorder } = lgResolveColor(activeBtn);
-
   const rect = lgGetBtnRect(activeBtn);
   if (!rect.width || !rect.height) return;
 
-  // ── Primera vez o reset forzado: aparecer directo sin animación ──────────────
+  // ── Primera vez / reset: posicionar directo ────────────────────────────────
   if (!lgInitDone) {
     lgApplyColor(destBg, destBorder);
-    lgApplyRect(rect);
-    lgIndicator.style.opacity   = '1';
-    lgIndicator.style.transform = 'none';
+    Object.assign(lgIndicator.style, {
+      left:      rect.left   + 'px',
+      top:       rect.top    + 'px',
+      width:     rect.width  + 'px',
+      height:    rect.height + 'px',
+      opacity:   '1',
+      transform: 'none',
+    });
     lgCurrentBtn = activeBtn;
     lgInitDone   = true;
     return;
   }
 
-  // Mismo botón: no hacer nada
   if (lgCurrentBtn === activeBtn) return;
 
   // Cancelar animación previa
@@ -114,10 +108,15 @@ export function lgMoveTo(activeBtn) {
   }
   lgIndicator.style.transform = 'none';
 
-  // ── Modo reducido: salto instantáneo ──────────────────────────────────────
+  // ── Reduced motion: salto directo ─────────────────────────────────────────
   if (prefersReduced) {
     lgApplyColor(destBg, destBorder);
-    lgApplyRect(rect);
+    Object.assign(lgIndicator.style, {
+      left:   rect.left   + 'px',
+      top:    rect.top    + 'px',
+      width:  rect.width  + 'px',
+      height: rect.height + 'px',
+    });
     lgCurrentBtn = activeBtn;
     return;
   }
@@ -125,16 +124,21 @@ export function lgMoveTo(activeBtn) {
   // ── Animación: translate desde posición actual → destino ──────────────────
   const fromBg     = lgReadCurrentBg();
   const fromBorder = lgReadCurrentBorder();
-  const fromLeft   = parseFloat(lgIndicator.style.left) || rect.left;
-  const fromTop    = parseFloat(lgIndicator.style.top)  || rect.top;
-  const fromWidth  = parseFloat(lgIndicator.style.width)  || rect.width;
-  const fromHeight = parseFloat(lgIndicator.style.height) || rect.height;
+  const fromLeft   = parseFloat(lgIndicator.style.left)   || rect.left;
+  const fromTop    = parseFloat(lgIndicator.style.top)    || rect.top;
+  const fromW      = parseFloat(lgIndicator.style.width)  || rect.width;
+  const fromH      = parseFloat(lgIndicator.style.height) || rect.height;
 
   const dx = fromLeft - rect.left;
   const dy = fromTop  - rect.top;
 
-  // Mover el indicador al destino — la animación lo compensa con translate
-  lgApplyRect(rect);
+  // Mover indicator al destino — la animación compensa con translate
+  Object.assign(lgIndicator.style, {
+    left:   rect.left   + 'px',
+    top:    rect.top    + 'px',
+    width:  rect.width  + 'px',
+    height: rect.height + 'px',
+  });
   lgCurrentBtn = activeBtn;
 
   const DUR = 420;
@@ -142,8 +146,8 @@ export function lgMoveTo(activeBtn) {
   const anim = lgIndicator.animate([
     {
       transform: `translate(${dx}px, ${dy}px) scale(1)`,
-      width:  fromWidth  + 'px',
-      height: fromHeight + 'px',
+      width:  fromW + 'px',
+      height: fromH + 'px',
       offset: 0,
       easing: 'cubic-bezier(0.28, 0, 0.12, 1)',
     },
@@ -158,8 +162,7 @@ export function lgMoveTo(activeBtn) {
       transform: `translate(0px, 0px) scale(0.982)`,
       width:  rect.width  + 'px',
       height: rect.height + 'px',
-      offset: 0.92,
-      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+      offset: 0.93,
     },
     {
       transform: `translate(0px, 0px) scale(1)`,
@@ -174,25 +177,23 @@ export function lgMoveTo(activeBtn) {
   // Interpolación de color independiente
   const midBg     = 'rgba(255,255,255,0.16)';
   const midBorder = 'rgba(255,255,255,0.38)';
-  const startTime = performance.now();
+  const t0 = performance.now();
 
   function colorFrame(now) {
     if (anim.playState === 'finished' || anim.playState === 'idle') {
       lgApplyColor(destBg, destBorder);
       return;
     }
-    const t = Math.min((now - startTime) / DUR, 1);
+    const t = Math.min((now - t0) / DUR, 1);
     let bg, border;
     if (t < 0.4) {
       const p = t / 0.4;
-      bg     = lgLerpColor(fromBg,     midBg,     p);
-      border = lgLerpColor(fromBorder, midBorder, p);
+      bg = lgLerpColor(fromBg, midBg, p); border = lgLerpColor(fromBorder, midBorder, p);
     } else if (t < 0.6) {
       bg = midBg; border = midBorder;
     } else {
       const p = (t - 0.6) / 0.4;
-      bg     = lgLerpColor(midBg,     destBg,     p);
-      border = lgLerpColor(midBorder, destBorder, p);
+      bg = lgLerpColor(midBg, destBg, p); border = lgLerpColor(midBorder, destBorder, p);
     }
     lgIndicator.style.background  = bg;
     lgIndicator.style.borderColor = border;
@@ -203,14 +204,13 @@ export function lgMoveTo(activeBtn) {
   anim.onfinish = () => {
     if (lgCurrentAnim === anim) lgCurrentAnim = null;
     lgApplyColor(destBg, destBorder);
-    lgIndicator.style.transform = 'none';
-    lgIndicator.style.width     = rect.width  + 'px';
-    lgIndicator.style.height    = rect.height + 'px';
+    Object.assign(lgIndicator.style, {
+      transform: 'none',
+      width:  rect.width  + 'px',
+      height: rect.height + 'px',
+    });
   };
-
-  anim.oncancel = () => {
-    lgIndicator.style.transform = 'none';
-  };
+  anim.oncancel = () => { lgIndicator.style.transform = 'none'; };
 }
 
 // ─── SYNC CON BOTÓN ACTIVO ─────────────────────────────────────────────────────
@@ -234,9 +234,7 @@ export function lgSyncWithActiveBtn() {
   lgMoveTo(activeBtn);
 }
 
-// ─── RESIZE / SCROLL ───────────────────────────────────────────────────────────
-// Con position:fixed el indicator se desincroniza si la página scrollea o
-// cambia de tamaño. El ResizeObserver lo resincroniza.
+// ─── RESIZE OBSERVER ───────────────────────────────────────────────────────────
 const lgResizeObserver = new ResizeObserver(() => {
   if (!lgInitDone) return;
   lgInitDone   = false;
@@ -244,25 +242,9 @@ const lgResizeObserver = new ResizeObserver(() => {
   setTimeout(lgSyncWithActiveBtn, 50);
 });
 
-// También resincronizar en scroll — el indicator es fixed pero el cat-bar
-// está en el flujo normal del documento (aunque la topbar es sticky).
-function lgOnScroll() {
-  if (!lgInitDone || !lgCurrentBtn) return;
-  const rect = lgGetBtnRect(lgCurrentBtn);
-  if (!rect.width) return;
-  Object.assign(lgIndicator.style, {
-    left: rect.left + 'px',
-    top:  rect.top  + 'px',
-  });
-}
-
 export function lgStartObserving() {
   const catBar = document.getElementById('cat-bar');
   if (catBar) lgResizeObserver.observe(catBar);
-
-  // Scroll listener — pasivo para no bloquear el hilo principal
-  window.addEventListener('scroll', lgOnScroll, { passive: true });
-
   if (document.fonts && document.fonts.ready) {
     document.fonts.ready.then(() => {
       lgInitDone   = false;

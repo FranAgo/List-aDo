@@ -99,14 +99,15 @@
     </div>
   </div>
   <div class="main">
-    <div class="cat-bar" id="cat-bar"></div>
-    <!-- Liquid glass indicator — absolute relativo a .main, 3 capas -->
-    <div id="lg-indicator" aria-hidden="true">
-      <div id="lg-refraction"></div>
-      <div id="lg-specular"></div>
+    <!-- cat-bar es position:relative — indicator y preview son sus hijos absolutos.
+         renderCatBar() los preserva al reescribir innerHTML. -->
+    <div class="cat-bar" id="cat-bar">
+      <div id="lg-indicator" aria-hidden="true">
+        <div id="lg-refraction"></div>
+        <div id="lg-specular"></div>
+      </div>
+      <div id="lg-preview" aria-hidden="true"></div>
     </div>
-    <!-- Liquid glass preview — hover sobre botones inactivos -->
-    <div id="lg-preview" aria-hidden="true"></div>
     <div id="view-container">
       <div class="loading-wrap">
         <div class="dot"></div>

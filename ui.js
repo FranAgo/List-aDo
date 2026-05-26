@@ -74,7 +74,15 @@ export function renderCatBar() {
   });
   h += `<button class="new-cat-btn" data-cat-action="new">+ Lista</button>`;
   h += `<button class="global-search-btn" id="global-search-toggle" title="Búsqueda global">⌕</button>`;
-  document.getElementById('cat-bar').innerHTML = h;
+  // Preservar indicator y preview antes de reescribir innerHTML
+  // (son hijos del cat-bar y se pierden con innerHTML =)
+  const catBarEl   = document.getElementById('cat-bar');
+  const lgInd      = document.getElementById('lg-indicator');
+  const lgPrev     = document.getElementById('lg-preview');
+  catBarEl.innerHTML = h;
+  // Reinsertar al principio para que queden debajo de los botones (z-index)
+  if (lgInd)  catBarEl.insertBefore(lgInd,  catBarEl.firstChild);
+  if (lgPrev) catBarEl.insertBefore(lgPrev, catBarEl.firstChild);
 
   // Drag events para reordenar categorías
   document.querySelectorAll('#cat-bar .cat-btn[data-idx]').forEach(btn => {
