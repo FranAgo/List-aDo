@@ -240,6 +240,14 @@ export function lgMoveTo(activeBtn) {
   const bounceSX2 = scaleXFinal * 0.975;
   const bounceSY2 = scaleYFinal * 1.025;
 
+  // Overshoot de posición: la gota se pasa del destino en la dirección del viaje,
+  // luego vuelve suavemente. El delta es proporcional a la distancia recorrida,
+  // pero acotado para que no sea exagerado en viajes largos.
+  const dist      = Math.sqrt(dx * dx + dy * dy);
+  const overshoot = Math.min(dist * 0.08, 10); // máx 10px de pasada
+  const ovX = dist > 0 ? (dx / dist) * overshoot : 0;
+  const ovY = dist > 0 ? (dy / dist) * overshoot : 0;
+
   const DUR = 500;
 
   // ── Keyframes: translate(dx,dy) + scaleX/Y que incluyen el ratio de tamaño ──
@@ -267,19 +275,19 @@ export function lgMoveTo(activeBtn) {
       easing: 'cubic-bezier(0.0, 0, 0.08, 1)',
     },
     {
-      // t=0.76: llegó — overshoot leve (rebote de gota al posarse)
-      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${bounceSX1.toFixed(4)}) scaleY(${bounceSY1.toFixed(4)})`,
-      offset: 0.76,
-      easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
-    },
-    {
-      // t=0.90: rebote inverso suave
-      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${bounceSX2.toFixed(4)}) scaleY(${bounceSY2.toFixed(4)})`,
-      offset: 0.90,
+      // t=0.74: overshoot — la gota se pasa del destino en la dirección del viaje
+      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(${bounceSX1.toFixed(4)}) scaleY(${bounceSY1.toFixed(4)})`,
+      offset: 0.74,
       easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // t=1: tamaño y posición finales exactos — sin salto en onfinish
+      // t=0.88: rebote inverso — vuelve levemente del otro lado
+      transform: `translate(${(dx - ovX * 0.3).toFixed(2)}px, ${(dy - ovY * 0.3).toFixed(2)}px) scaleX(${bounceSX2.toFixed(4)}) scaleY(${bounceSY2.toFixed(4)})`,
+      offset: 0.88,
+      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
+    },
+    {
+      // t=1: posición y tamaño finales exactos — sin salto en onfinish
       transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${scaleXFinal.toFixed(4)}) scaleY(${scaleYFinal.toFixed(4)})`,
       offset: 1.00,
     },
