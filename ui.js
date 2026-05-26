@@ -4,9 +4,9 @@
 import { state }                        from './state.js';
 import { getCatColor, catColors }       from './storage.js';
 import { isoToDisplay, fmtDate, fmtCreatedAt, parseUserDate } from './dates.js';
-import { lgSyncWithActiveBtn, lgIndicator, lgCurrentAnim,
+import { lgSyncWithActiveBtn, lgIndicator, lgState,
          setLgCurrentAnim, setLgInitDone, setLgCurrentBtn,
-         lgSwitching, setLgSwitching }  from './animations.js';
+         setLgSwitching }              from './animations.js';
 
 // ─── UTILIDADES ────────────────────────────────────────────────────────────────
 export function esc(s) {
@@ -91,7 +91,7 @@ export function renderCatBar() {
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', state.catDragIdx);
       btn.style.opacity = '0.4';
-      if (lgCurrentAnim) { lgCurrentAnim.cancel(); setLgCurrentAnim(null); }
+      if (lgState.currentAnim) { lgState.currentAnim.cancel(); setLgCurrentAnim(null); }
       lgIndicator.style.transform = 'none';
       setLgInitDone(false);
       setLgCurrentBtn(null);
@@ -151,7 +151,7 @@ export function switchCat(c) {
   // preservar la animación de viaje entre listas existentes.
   setLgCurrentBtn(null);
   setLgSwitching(true);
-  if (lgCurrentAnim) { lgCurrentAnim.cancel(); setLgCurrentAnim(null); }
+  if (lgState.currentAnim) { lgState.currentAnim.cancel(); setLgCurrentAnim(null); }
   lgIndicator.style.transform = 'none';
   renderCatBar();
   const vc = document.getElementById('view-container');

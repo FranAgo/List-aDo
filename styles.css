@@ -335,6 +335,7 @@ body {
   padding: 1.5rem;
   max-width: 1100px;
   margin: 0 auto;
+  position: relative; /* contexto de posicionamiento para #lg-indicator y #lg-preview */
 }
 
 /* ─── CATEGORY BAR ───────────────────────────────────────────────────────── */
@@ -1474,8 +1475,21 @@ body {
 }
 
 /* ─── LIQUID GLASS INDICATOR ────────────────────────────────────────────── */
+/*
+  Reescritura desde cero — estilo Apple WWDC25 Liquid Glass.
 
-/* SVG filter host — invisible, solo define filtros referenciados por ID */
+  Arquitectura de capas del #lg-indicator:
+    1. #lg-indicator        → forma base + tinte de color + sombra exterior + borde
+    2. #lg-refraction       → backdrop-filter blur + SVG displacement (lensing, Chrome/Edge)
+                              Safari/Firefox: fallback blur solo
+    3. #lg-specular         → gradiente de highlight (luz desde arriba)
+    4. #lg-specular::before → línea especular superior (rim highlight)
+    5. #lg-specular::after  → reflejo inferior difuso (profundidad)
+
+  Los botones (z-index: 11/13) siempre quedan encima del indicador (z-index: 10).
+*/
+
+/* SVG filter host — invisible en el DOM, solo expone el filter #lg-refract */
 .lg-filter-host {
   position: absolute;
   width: 0;
@@ -1484,19 +1498,7 @@ body {
   pointer-events: none;
 }
 
-/* .main necesita position:relative — el indicador es absolute relativo a él */
-.main {
-  position: relative;
-}
-
-/*
-  El indicador tiene tres capas apiladas:
-    1. #lg-indicator        → forma + color tintado + sombra exterior
-    2. #lg-refraction       → backdrop-filter con SVG displacement → refracción
-    3. #lg-specular         → specular rim CSS puro → borde brillante
-  Los botones (z-index: 11) siempre quedan encima.
-*/
-
+/* ── Forma base ─────────────────────────────────────────────────────────── */
 #lg-indicator {
   position: absolute;
   top: 0; left: 0;
@@ -1508,61 +1510,89 @@ body {
   will-change: transform;
   overflow: hidden;
 
-  /* Fondo base: tinte de color — lgApplyColor lo sobreescribe dinámicamente */
+  /* Tinte de color base — sobreescrito dinámicamente por lgApplyColor() */
   background: rgba(255, 255, 255, 0.10);
 
-  /* Borde definido: 1px sólido semi-transparente que sigue el border-radius */
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  /* Borde exterior: gradiente simulado con box-shadow interior blanco arriba
+     y el border real con tinte de color (sobreescrito dinámicamente) */
+  border: 1px solid rgba(255, 255, 255, 0.22);
 
-  /* Sombra exterior contenida — sin spread para no derramar */
+  /* Sombras: exterior para elevar, interior para profundidad de vidrio */
   box-shadow:
-    0 2px 12px rgba(0, 0, 0, 0.40),
-    0 1px  4px rgba(0, 0, 0, 0.20);
+    0 4px 16px rgba(0, 0, 0, 0.38),
+    0 1px  5px rgba(0, 0, 0, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.12);
 }
 
-/* Capa de refracción: blur + displacement SVG sobre el fondo */
+/* ── Capa de refracción — lensing del fondo ─────────────────────────────── */
 #lg-refraction {
   position: absolute;
-  inset: -1px;           /* 1px extra para cubrir el borde */
+  inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  /* backdrop-filter con SVG: Chrome/Edge. Safari usa el blur simple del fallback */
-  backdrop-filter:          blur(12px) saturate(1.6) brightness(1.08) url(#lg-refract);
-  -webkit-backdrop-filter:  blur(12px) saturate(1.6) brightness(1.08);
+
+  /*
+    Chrome/Edge: blur + saturate + displacement SVG → lensing real.
+    Safari/Firefox: solo blur + saturate (fallback glassmorphism correcto).
+    La coma separa los valores del shorthand; el url() solo lo parsea Chromium.
+  */
+  backdrop-filter:         blur(14px) saturate(1.8) brightness(1.06) url(#lg-refract);
+  -webkit-backdrop-filter: blur(14px) saturate(1.8) brightness(1.06);
 }
 
-/* Specular rim: reflejo de luz que sigue la curvatura del pill */
+/* ── Highlight especular — luz desde arriba (estilo Apple) ─────────────── */
 #lg-specular {
   position: absolute;
   inset: 0;
   border-radius: inherit;
   pointer-events: none;
-  /* Gradiente suave — opacidad moderada para no quemar el contorno */
+
+  /* Gradiente vertical: zona superior brillante, fade a transparente */
   background: linear-gradient(
-    180deg,
-    rgba(255, 255, 255, 0.22)  0%,
-    rgba(255, 255, 255, 0.06)  40%,
-    rgba(255, 255, 255, 0.00)  70%
+    170deg,
+    rgba(255, 255, 255, 0.28)  0%,
+    rgba(255, 255, 255, 0.10)  35%,
+    rgba(255, 255, 255, 0.00)  65%,
+    rgba(0,   0,   0,   0.04) 100%
   );
 }
 
-/* Línea especular superior: sigue el border-radius del pill */
+/* Línea especular superior — el rim de luz característico del glass de Apple */
 #lg-specular::before {
   content: '';
   position: absolute;
-  top: 1px; left: 8%; width: 84%; height: 1px;
+  top: 1px; left: 10%; width: 80%; height: 1px;
   background: linear-gradient(
     90deg,
-    transparent 0%,
-    rgba(255, 255, 255, 0.55) 20%,
-    rgba(255, 255, 255, 0.70) 50%,
-    rgba(255, 255, 255, 0.55) 80%,
-    transparent 100%
+    transparent                   0%,
+    rgba(255, 255, 255, 0.60)    18%,
+    rgba(255, 255, 255, 0.82)    50%,
+    rgba(255, 255, 255, 0.60)    82%,
+    transparent                  100%
   );
   border-radius: 1px;
 }
 
-/* Botones inactivos debajo del indicador durante el viaje */
+/* Reflejo inferior difuso — simula luz rebotada (efecto de profundidad) */
+#lg-specular::after {
+  content: '';
+  position: absolute;
+  bottom: 1px; left: 20%; width: 60%; height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent                   0%,
+    rgba(255, 255, 255, 0.20)    30%,
+    rgba(255, 255, 255, 0.28)    50%,
+    rgba(255, 255, 255, 0.20)    70%,
+    transparent                  100%
+  );
+  border-radius: 1px;
+}
+
+/* ── Z-index stack de botones ───────────────────────────────────────────── */
+
+/* Botones inactivos: por encima del indicador para recibir eventos */
 .cat-bar .cat-btn,
 .cat-bar .new-cat-btn,
 .cat-bar .global-search-btn {
@@ -1570,18 +1600,18 @@ body {
   z-index: 11;
 }
 
-/* Botón activo: siempre encima del glass para que su texto sea visible */
+/* Botón activo: siempre por encima del glass */
 .cat-bar .cat-btn.active {
   z-index: 13;
 }
 
-/* Botón activo: pierde su fondo (el glass lo reemplaza) */
+/* Cuando el glass está activo, el botón activo cede su fondo al indicador */
 .cat-bar.lg-active .cat-btn.active {
   background: transparent !important;
   box-shadow:  none !important;
 }
 
-/* "Tareas de hoy": restaurar color de texto que .active pisa */
+/* "Tareas de hoy": el .active pisa el color — restaurar el acento */
 .cat-bar.lg-active .cat-btn.active[data-cat-action="today"] {
   color: var(--accent) !important;
 }
@@ -1596,13 +1626,19 @@ body {
   z-index: 9;
   opacity: 0;
   overflow: hidden;
-  backdrop-filter: blur(8px) saturate(1.3);
-  -webkit-backdrop-filter: blur(8px) saturate(1.3);
-  background: rgba(255, 255, 255, 0.06);
+
+  backdrop-filter:         blur(10px) saturate(1.4);
+  -webkit-backdrop-filter: blur(10px) saturate(1.4);
+
+  background: rgba(255, 255, 255, 0.05);
+
   box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.30),
-    0 2px 10px rgba(0, 0, 0, 0.20);
-  transition: opacity .14s ease;
+    inset 0 1px 0 rgba(255, 255, 255, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.08),
+    0 2px 12px rgba(0, 0, 0, 0.18);
+
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  transition: opacity .12s ease;
 }
 
 /* Reduced motion — salta directo, sin animación */

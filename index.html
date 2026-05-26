@@ -30,35 +30,34 @@
 
 <!-- ─── LIQUID GLASS — SVG FILTERS ──────────────────────────────────────────── -->
 <!--
-  lg-refract: simula refracción en los bordes de la cápsula.
+  lg-refract: simula el efecto de lensing de Apple WWDC25.
   Pipeline:
-    1. feTurbulence  → ruido orgánico base (textura de vidrio)
-    2. feGaussianBlur → suaviza el ruido para que la distorsión sea fluida
-    3. feDisplacementMap → desplaza el backdrop según el mapa de ruido
-  El scale bajo (4) da un efecto sutil; el blur del ruido (2) lo hace orgánico.
+    1. feTurbulence   → ruido fractal de baja frecuencia (textura orgánica de vidrio)
+    2. feGaussianBlur → suaviza el mapa de ruido para distorsión fluida, no granulada
+    3. feDisplacementMap → desplaza los píxeles del backdrop según el mapa suavizado
+
+  El scale (6) produce un lensing sutil pero visible en los bordes.
+  baseFrequency baja → ondas largas que se parecen a refracción real de vidrio.
+  Solo funciona en Chrome/Edge (backdrop-filter: url()). Safari usa fallback blur.
 -->
 <svg class="lg-filter-host" xmlns="http://www.w3.org/2000/svg">
   <defs>
-    <filter id="lg-refract" x="-15%" y="-15%" width="130%" height="130%"
+    <filter id="lg-refract" x="-20%" y="-20%" width="140%" height="140%"
             color-interpolation-filters="sRGB">
-      <!-- Ruido orgánico de baja frecuencia → distorsión fluida, no granulada -->
       <feTurbulence
         type="fractalNoise"
-        baseFrequency="0.018 0.022"
-        numOctaves="4"
-        seed="5"
+        baseFrequency="0.012 0.016"
+        numOctaves="3"
+        seed="8"
         result="noise"
       />
-      <!-- Suavizar el mapa de ruido → transiciones más suaves entre zonas -->
-      <feGaussianBlur in="noise" stdDeviation="2" result="smoothNoise" />
-      <!-- Desplazar el backdrop según el mapa suavizado -->
+      <feGaussianBlur in="noise" stdDeviation="3" result="smoothNoise" />
       <feDisplacementMap
         in="SourceGraphic"
         in2="smoothNoise"
-        scale="7"
+        scale="6"
         xChannelSelector="R"
         yChannelSelector="G"
-        result="refracted"
       />
     </filter>
   </defs>
