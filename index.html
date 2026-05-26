@@ -42,6 +42,7 @@
 -->
 <svg class="lg-filter-host" xmlns="http://www.w3.org/2000/svg">
   <defs>
+    <!-- Refracción base: blur + desplazamiento fractal suave para el body del indicador -->
     <filter id="lg-refract" x="-20%" y="-20%" width="140%" height="140%"
             color-interpolation-filters="sRGB">
       <feTurbulence
@@ -56,6 +57,27 @@
         in="SourceGraphic"
         in2="smoothNoise"
         scale="6"
+        xChannelSelector="R"
+        yChannelSelector="G"
+      />
+    </filter>
+
+    <!-- Lupa de borde: distorsión más agresiva para los 4 rims del indicador.
+         baseFrequency anisotrópica (más alta en Y) → curva el borde como una gota real.
+         scale="10" → efecto visible sin ser grotesco. -->
+    <filter id="lg-lens" x="-30%" y="-30%" width="160%" height="160%"
+            color-interpolation-filters="sRGB">
+      <feTurbulence
+        type="turbulence"
+        baseFrequency="0.01 0.08"
+        numOctaves="1"
+        seed="4"
+        result="turbulence"
+      />
+      <feDisplacementMap
+        in="SourceGraphic"
+        in2="turbulence"
+        scale="10"
         xChannelSelector="R"
         yChannelSelector="G"
       />
@@ -104,6 +126,13 @@
       <div id="lg-refraction" aria-hidden="true"></div>
       <div id="lg-indicator" aria-hidden="true">
         <div id="lg-specular"></div>
+        <!-- 4 bordes de distorsión: backdrop-filter: url(#lg-lens) sobre cada rim.
+             Mismo approach que el glass-effect del ejemplo de referencia.
+             Producen el efecto de lupa en los bordes de la gota. -->
+        <div class="lg-rim lg-rim--top"></div>
+        <div class="lg-rim lg-rim--bottom"></div>
+        <div class="lg-rim lg-rim--left"></div>
+        <div class="lg-rim lg-rim--right"></div>
       </div>
       <div id="lg-preview" aria-hidden="true"></div>
     </div>

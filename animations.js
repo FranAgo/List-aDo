@@ -1,9 +1,11 @@
 // ─── animations.js ─────────────────────────────────────────────────────────────
 // Liquid glass indicator, confetti, sonido de completado.
 //
-// Reescritura desde cero — arquitectura de estado simplificada.
-// Un único objeto `lgState` reemplaza los 6 exports separados con setters,
-// eliminando la fuente principal de race conditions.
+// Efecto de gota de agua — 4 fases físicas:
+//   1. Compresión: la gota se achica antes de moverse (como al presionarla)
+//   2. Elongación: se estira en la dirección del viaje (inercia de masa)
+//   3. Rebote: overshoot al llegar al destino
+//   4. Lupa: estado en reposo con bordes de distorsión activos
 
 import { catColors } from './storage.js';
 
@@ -13,32 +15,25 @@ export const lgIndicator  = document.getElementById('lg-indicator');
 export const lgPreview    = document.getElementById('lg-preview');
 
 // ─── ESTADO INTERNO ────────────────────────────────────────────────────────────
-// Un objeto mutable compartido por referencia. No hay setters: los módulos
-// que necesitan mutar el estado lo importan y escriben directamente.
 export const lgState = {
-  currentBtn:    null,   // botón activo actual (nodo DOM)
-  initDone:      false,  // ¿ya se posicionó al menos una vez?
-  currentAnim:   null,   // Animation object activo (para cancelar)
-  switching:     false,  // ¿estamos en medio de un switchCat?
-  previewActive: false,  // ¿hay hover preview visible?
+  currentBtn:      null,
+  initDone:        false,
+  currentAnim:     null,
+  currentRefrAnim: null,  // animación de lgRefraction — referencia para poder cancelarla
+  switching:       false,
+  previewActive:   false,
 };
 
 // ─── COMPATIBILIDAD: EXPORTS LEGACY ───────────────────────────────────────────
-// ui.js y categories.js importan los setters del archivo anterior.
-// Se mantienen como wrappers para no tener que modificar esos archivos.
 export function setLgCurrentBtn(v)    { lgState.currentBtn  = v; }
 export function setLgInitDone(v)      { lgState.initDone    = v; }
 export function setLgCurrentAnim(v)   { lgState.currentAnim = v; }
 export function setLgSwitching(v)     { lgState.switching   = v; }
 export function setLgPreviewActive(v) { lgState.previewActive = v; }
-
-// Exports directos para compatibilidad con ui.js que los lee como valores
-export function getLgCurrentAnim()  { return lgState.currentAnim; }
-export function getLgSwitching()    { return lgState.switching; }
+export function getLgCurrentAnim()    { return lgState.currentAnim; }
+export function getLgSwitching()      { return lgState.switching; }
 
 // ─── POSICIONAMIENTO ───────────────────────────────────────────────────────────
-// offsetLeft/offsetTop son relativos al padre (#cat-bar, position:relative).
-// No dependen del viewport ni del scroll — son estables post-layout.
 function getBtnRect(btn) {
   if (!btn) return { left: 0, top: 0, width: 0, height: 0 };
   return {
@@ -79,20 +74,15 @@ function resolveColor(btn) {
   const catName = btn?.dataset?.cat;
   if (catName && catColors[catName]?.bg) {
     const raw = catColors[catName].bg;
-    // Amplificar la opacidad para que el tinte sea visible sobre el fondo blanco del glass
     const bg = raw.replace(/([.\d]+)\)$/, (_, v) =>
       `${Math.min(parseFloat(v) * 3.5, 0.45)})`
     );
     return { bg, border: catColors[catName].border };
   }
-  // Sin categoría (ej: "Tareas de hoy") → glass neutro gris, sin tinte de color
   return { bg: 'rgba(180,180,180,0.13)', border: 'rgba(200,200,200,0.30)' };
 }
 
 // ─── APLICAR POSICIÓN AL DOM ───────────────────────────────────────────────────
-// Ambos elementos (lgRefraction y lgIndicator) deben ocupar el mismo rect.
-// lgRefraction va PRIMERO en z-index (10) — backdrop-filter sin clip.
-// lgIndicator va ENCIMA (11) — tinte + borde + specular.
 function applyRect(rect) {
   const pos = {
     left:   rect.left   + 'px',
@@ -104,27 +94,21 @@ function applyRect(rect) {
   Object.assign(lgIndicator.style, pos);
 }
 
-// ─── MOVIMIENTO PRINCIPAL ──────────────────────────────────────────────────────
+// ─── MOVIMIENTO PRINCIPAL — 4 FASES DE GOTA ──────────────────────────────────
 export function lgMoveTo(activeBtn) {
   if (!lgIndicator || !activeBtn) return;
 
   const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   const { bg: destBg, border: destBorder } = resolveColor(activeBtn);
-  const rect = getBtnRect(activeBtn);
-  if (!rect.width || !rect.height) return;
+  const destRect = getBtnRect(activeBtn);
+  if (!destRect.width || !destRect.height) return;
 
   // ── Primera vez: posicionar sin animación ─────────────────────────────────
   if (!lgState.initDone) {
     applyColor(destBg, destBorder);
-    applyRect(rect);
-    Object.assign(lgIndicator.style, {
-      opacity:   '1',
-      transform: 'none',
-    });
-    if (lgRefraction) Object.assign(lgRefraction.style, {
-      opacity:   '1',
-      transform: 'none',
-    });
+    applyRect(destRect);
+    Object.assign(lgIndicator.style, { opacity: '1', transform: 'none' });
+    if (lgRefraction) Object.assign(lgRefraction.style, { opacity: '1', transform: 'none' });
     lgState.currentBtn = activeBtn;
     lgState.initDone   = true;
     return;
@@ -137,80 +121,122 @@ export function lgMoveTo(activeBtn) {
     lgState.currentAnim.cancel();
     lgState.currentAnim = null;
   }
+  if (lgState.currentRefrAnim) {
+    lgState.currentRefrAnim.cancel();
+    lgState.currentRefrAnim = null;
+  }
   lgIndicator.style.transform = 'none';
 
   // ── Reduced motion: salto directo ─────────────────────────────────────────
   if (prefersReduced) {
     applyColor(destBg, destBorder);
-    applyRect(rect);
+    applyRect(destRect);
     if (lgRefraction) lgRefraction.style.transform = 'none';
     lgState.currentBtn = activeBtn;
     return;
   }
 
-  // ── Animación FLIP: translate desde posición actual → destino ─────────────
+  // ── Leer estado actual antes de mover ─────────────────────────────────────
   const fromBg     = readCurrentBg();
   const fromBorder = readCurrentBorder();
-  const fromLeft   = parseFloat(lgIndicator.style.left)   || rect.left;
-  const fromTop    = parseFloat(lgIndicator.style.top)    || rect.top;
-  const fromW      = parseFloat(lgIndicator.style.width)  || rect.width;
-  const fromH      = parseFloat(lgIndicator.style.height) || rect.height;
+  const fromLeft   = parseFloat(lgIndicator.style.left)   || destRect.left;
+  const fromTop    = parseFloat(lgIndicator.style.top)    || destRect.top;
+  const fromW      = parseFloat(lgIndicator.style.width)  || destRect.width;
+  const fromH      = parseFloat(lgIndicator.style.height) || destRect.height;
 
-  const dx = fromLeft - rect.left;
-  const dy = fromTop  - rect.top;
+  // Vector de desplazamiento para saber si el movimiento es horizontal o vertical
+  const dx = destRect.left - fromLeft;
+  const dy = destRect.top  - fromTop;
+  const isHorizontal = Math.abs(dx) >= Math.abs(dy);
 
-  // Mover el indicator al destino antes de animar
-  applyRect(rect);
+  // Elongación: la gota se estira en la dirección del movimiento.
+  // scaleX mayor si viaja horizontal, scaleY mayor si viaja vertical.
+  const ELONGATION_AXIS   = 1.28;  // eje del movimiento: se estira
+  const ELONGATION_CROSS  = 0.82;  // eje perpendicular: se comprime (conservación de volumen)
+  const elongScaleX = isHorizontal ? ELONGATION_AXIS : ELONGATION_CROSS;
+  const elongScaleY = isHorizontal ? ELONGATION_CROSS : ELONGATION_AXIS;
+
+  // Mover el rect al destino antes de animar (técnica FLIP)
+  applyRect(destRect);
   lgState.currentBtn = activeBtn;
 
-  const DUR = 400;
+  // ── Keyframes de las 4 fases ──────────────────────────────────────────────
+  //
+  //  0.00 → 0.12 : FASE 1 — Compresión. La gota se achica como al ser presionada.
+  //  0.12 → 0.70 : FASE 2 — Elongación + viaje. Se estira en la dirección del vector.
+  //  0.70 → 0.88 : FASE 3 — Overshoot. Llega al destino y rebota levemente.
+  //  0.88 → 1.00 : FASE 4 — Asentamiento. Vuelve a escala 1 y activa los rims de lupa.
+  //
+  //  El truco FLIP: el indicator ya está en destRect.
+  //  Empezamos con un translate(dx, dy) que lo pone visualmente en el origen,
+  //  y animamos hacia translate(0,0). El scale va encima de eso.
+
+  const DUR = 480;
 
   const anim = lgIndicator.animate([
     {
-      transform: `translate(${dx}px, ${dy}px) scaleX(${fromW / rect.width}) scaleY(${fromH / rect.height})`,
+      // Posición visual: origen. Escala: comprimida (fase 1)
+      transform: `translate(${dx}px, ${dy}px) scaleX(${fromW / destRect.width * 0.88}) scaleY(${fromH / destRect.height * 0.88})`,
       offset:    0,
-      easing:    'cubic-bezier(0.28, 0, 0.12, 1)',
+      easing:    'cubic-bezier(0.4, 0, 0.2, 1)',
     },
     {
-      transform: 'translate(0px, 0px) scale(1.045)',
-      offset:    0.80,
+      // Compresión máxima: la gota se achica antes de salir (offset 0.10)
+      transform: `translate(${dx * 0.95}px, ${dy * 0.95}px) scaleX(${fromW / destRect.width * 0.82}) scaleY(${fromH / destRect.height * 0.82})`,
+      offset:    0.10,
+      easing:    'cubic-bezier(0.2, 0, 0.0, 1)',
+    },
+    {
+      // Mitad del viaje: elongada en la dirección del movimiento
+      transform: `translate(${dx * 0.4}px, ${dy * 0.4}px) scaleX(${elongScaleX}) scaleY(${elongScaleY})`,
+      offset:    0.45,
+      easing:    'cubic-bezier(0.0, 0, 0.2, 1)',
+    },
+    {
+      // Llegada: overshoot leve (rebote)
+      transform: `translate(0px, 0px) scaleX(1.06) scaleY(0.94)`,
+      offset:    0.72,
+      easing:    'cubic-bezier(0.34, 1.56, 0.64, 1)',
+    },
+    {
+      // Rebote inverso suave
+      transform: `translate(0px, 0px) scaleX(0.97) scaleY(1.03)`,
+      offset:    0.88,
       easing:    'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      transform: 'translate(0px, 0px) scale(0.985)',
-      offset:    0.92,
-    },
-    {
-      transform: 'translate(0px, 0px) scale(1)',
+      // Asentamiento final: escala 1 exacta
+      transform: `translate(0px, 0px) scale(1)`,
       offset:    1.00,
     },
   ], { duration: DUR, fill: 'none' });
 
   lgState.currentAnim = anim;
 
-  // Interpolación de color independiente del WAAPI
-  const midBg     = 'rgba(255,255,255,0.14)';
-  const midBorder = 'rgba(255,255,255,0.36)';
+  // ── Interpolación de color durante el viaje ───────────────────────────────
+  // Pico de blanco al cruzar la mitad → da sensación de "destello" de movimiento
+  const midBg     = 'rgba(255,255,255,0.16)';
+  const midBorder = 'rgba(255,255,255,0.40)';
   const t0 = performance.now();
 
   function colorFrame(now) {
-    const state = anim.playState;
-    if (state === 'finished' || state === 'idle') {
+    const playState = anim.playState;
+    if (playState === 'finished' || playState === 'idle') {
       applyColor(destBg, destBorder);
       return;
     }
     const t = Math.min((now - t0) / DUR, 1);
     let bg, border;
-    if (t < 0.4) {
-      const p = t / 0.4;
-      bg = lerpColor(fromBg, midBg, p);
+    if (t < 0.45) {
+      const p = t / 0.45;
+      bg     = lerpColor(fromBg, midBg, p);
       border = lerpColor(fromBorder, midBorder, p);
-    } else if (t < 0.6) {
-      bg = midBg;
+    } else if (t < 0.60) {
+      bg     = midBg;
       border = midBorder;
     } else {
-      const p = (t - 0.6) / 0.4;
-      bg = lerpColor(midBg, destBg, p);
+      const p = (t - 0.60) / 0.40;
+      bg     = lerpColor(midBg, destBg, p);
       border = lerpColor(midBorder, destBorder, p);
     }
     applyColor(bg, border);
@@ -218,21 +244,45 @@ export function lgMoveTo(activeBtn) {
   }
   requestAnimationFrame(colorFrame);
 
+  // ── Sincronizar lgRefraction con el mismo movimiento ─────────────────────
+  // lgRefraction sigue al indicator pero con un delay mínimo para que el blur
+  // no corte el contenido durante la compresión inicial.
+  // Se guarda en lgState.currentRefrAnim para poder cancelarlo en clicks rápidos.
+  if (lgRefraction) {
+    const refrAnim = lgRefraction.animate([
+      { transform: `translate(${dx}px, ${dy}px)`, offset: 0, easing: 'cubic-bezier(0.2, 0, 0.0, 1)' },
+      { transform: `translate(${dx * 0.4}px, ${dy * 0.4}px)`, offset: 0.45, easing: 'cubic-bezier(0.0, 0, 0.2, 1)' },
+      { transform: 'translate(0px, 0px)', offset: 0.78 },
+      { transform: 'translate(0px, 0px)', offset: 1.00 },
+    ], { duration: DUR, fill: 'none', delay: 40 });
+
+    lgState.currentRefrAnim = refrAnim;
+
+    refrAnim.onfinish = () => {
+      if (lgState.currentRefrAnim === refrAnim) lgState.currentRefrAnim = null;
+      lgRefraction.style.transform = 'none';
+    };
+    refrAnim.oncancel = () => {
+      if (lgState.currentRefrAnim === refrAnim) lgState.currentRefrAnim = null;
+      lgRefraction.style.transform = 'none';
+    };
+  }
+
   anim.onfinish = () => {
     if (lgState.currentAnim === anim) lgState.currentAnim = null;
     applyColor(destBg, destBorder);
     lgIndicator.style.transform = 'none';
-    lgIndicator.style.width     = rect.width  + 'px';
-    lgIndicator.style.height    = rect.height + 'px';
+    lgIndicator.style.width     = destRect.width  + 'px';
+    lgIndicator.style.height    = destRect.height + 'px';
     if (lgRefraction) {
       lgRefraction.style.transform = 'none';
-      lgRefraction.style.width     = rect.width  + 'px';
-      lgRefraction.style.height    = rect.height + 'px';
+      lgRefraction.style.width     = destRect.width  + 'px';
+      lgRefraction.style.height    = destRect.height + 'px';
     }
   };
 
   anim.oncancel = () => {
-    lgIndicator.style.transform  = 'none';
+    lgIndicator.style.transform = 'none';
     if (lgRefraction) lgRefraction.style.transform = 'none';
   };
 }
@@ -263,7 +313,6 @@ export function lgSyncWithActiveBtn() {
 // ─── RESIZE OBSERVER ───────────────────────────────────────────────────────────
 const lgResizeObserver = new ResizeObserver(() => {
   if (!lgState.initDone) return;
-  // Reset para que lgMoveTo reposicione sin animar
   lgState.initDone   = false;
   lgState.currentBtn = null;
   setTimeout(lgSyncWithActiveBtn, 50);

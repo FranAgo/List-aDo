@@ -1532,6 +1532,9 @@ body {
   opacity: 0;
   will-change: transform;
 
+  /* overflow: visible para que la gota pueda exceder el contorno del botón */
+  overflow: visible;
+
   /* Tinte blanco pronunciado — el rasgo más visible del glass de Apple.
      lgApplyColor() sobreescribe este background con el tinte de categoría,
      pero el CSS base ya tiene la opacidad correcta. */
@@ -1589,6 +1592,48 @@ body {
   bottom: 0; left: 0; right: 0; height: 1px;
   background: rgba(0, 0, 0, 0.18);
   border-radius: 0 0 20px 20px;
+}
+
+/* ── Capa 4: bordes de distorsión (efecto lupa de gota) ──────────────────── */
+/*
+  Cuatro franjas posicionadas en los rims del indicador.
+  Cada una aplica el filtro #lg-lens via backdrop-filter.
+  Esto distorsiona el contenido detrás en los bordes → efecto de lupa de gota real.
+  El grosor (6px en horizontal, 8px en vertical) está calibrado para
+  ser visible pero sutil — una gota, no una lupa de laboratorio.
+*/
+.lg-rim {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+
+  /* Solo Chrome/Edge soporta backdrop-filter con url(). Safari ve nada (fallback graceful). */
+  -webkit-backdrop-filter: url(#lg-lens);
+  backdrop-filter: url(#lg-lens);
+}
+
+.lg-rim--top {
+  top: -3px;
+  left: 0; right: 0;
+  height: 8px;
+}
+
+.lg-rim--bottom {
+  bottom: -3px;
+  left: 0; right: 0;
+  height: 8px;
+}
+
+.lg-rim--left {
+  left: -3px;
+  top: 0; bottom: 0;
+  width: 6px;
+}
+
+.lg-rim--right {
+  right: -3px;
+  top: 0; bottom: 0;
+  width: 6px;
 }
 
 /* ── Z-index stack de botones ───────────────────────────────────────────── */
