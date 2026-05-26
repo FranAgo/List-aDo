@@ -136,13 +136,22 @@ export function lgMoveTo(activeBtn) {
     return;
   }
 
-  // ── Leer estado actual antes de mover ─────────────────────────────────────
+  // ── Leer posición visual actual ANTES de cualquier mutación ──────────────
+  // getBoundingClientRect() devuelve la posición visual real en pantalla,
+  // incluyendo cualquier transform activo. Esto es crítico cuando se interrumpe
+  // una animación en curso: style.left apunta al destino anterior, no al visual.
   const fromBg     = readCurrentBg();
   const fromBorder = readCurrentBorder();
-  const fromLeft   = parseFloat(lgIndicator.style.left)   || destRect.left;
-  const fromTop    = parseFloat(lgIndicator.style.top)    || destRect.top;
-  const fromW      = parseFloat(lgIndicator.style.width)  || destRect.width;
-  const fromH      = parseFloat(lgIndicator.style.height) || destRect.height;
+
+  const catBar     = document.getElementById('cat-bar');
+  const barRect    = catBar ? catBar.getBoundingClientRect() : { left: 0, top: 0 };
+  const indRect    = lgIndicator.getBoundingClientRect();
+
+  // Posición del indicator en coordenadas relativas al cat-bar
+  const fromLeft = indRect.left - barRect.left;
+  const fromTop  = indRect.top  - barRect.top;
+  const fromW    = indRect.width;
+  const fromH    = indRect.height;
 
   // Vector de desplazamiento para saber si el movimiento es horizontal o vertical
   const dx = destRect.left - fromLeft;
