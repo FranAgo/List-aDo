@@ -280,26 +280,6 @@ export function lgMoveTo(activeBtn) {
   };
 }
 
-    }
-    applyColor(bg, border);
-    if (t < 1) requestAnimationFrame(colorFrame);
-  }
-  requestAnimationFrame(colorFrame);
-
-  anim.onfinish = () => {
-    if (lgState.currentAnim === anim) lgState.currentAnim = null;
-    // Fijar posición final en left/top/width/height y limpiar transform
-    applyColor(destBg, destBorder);
-    applyRect(destRect);
-    lgIndicator.style.transform = 'none';
-    if (lgRefraction) lgRefraction.style.transform = 'none';
-  };
-
-  anim.oncancel = () => {
-    lgIndicator.style.transform = 'none';
-    if (lgRefraction) lgRefraction.style.transform = 'none';
-  };
-}
 
 // ─── SYNC CON BOTÓN ACTIVO ─────────────────────────────────────────────────────
 export function lgSyncWithActiveBtn() {
