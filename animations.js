@@ -77,7 +77,7 @@ function readCurrentBorder() {
 
 function resolveColor(btn) {
   const catName = btn?.dataset?.cat;
-  if (catName && catColors[catName]) {
+  if (catName && catColors[catName]?.bg) {
     const raw = catColors[catName].bg;
     // Amplificar la opacidad para que el tinte sea visible sobre el fondo blanco del glass
     const bg = raw.replace(/([.\d]+)\)$/, (_, v) =>
