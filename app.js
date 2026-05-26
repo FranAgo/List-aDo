@@ -15,6 +15,8 @@ import { toggleGlobalSearch, setGsFilter,
          renderCalendar, switchCat }                     from './ui.js';
 import { onDueInput }                                     from './dates.js';
 import { state }                                          from './state.js';
+import { lgShowPreview, lgHidePreview }                  from './animations.js';
+import { api }                                            from './api.js';
 
 // ─── REGISTRAR CALLBACKS GLOBALES ──────────────────────────────────────────────
 // ui.js y animations.js necesitan llamar a setupDrag/setupSwipe sin importar tasks.js
@@ -26,7 +28,6 @@ window._uiCalendar = { closeCalendar };
 
 // commitPendingUndo necesita llamar a api — se registra el callback aquí.
 // (ui.js no importa api.js para no crear una dependencia cruzada innecesaria)
-import { api } from './api.js';
 window._apiDeleteTask = (id) => api({ action: 'deleteTask', id });
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────────
@@ -192,7 +193,6 @@ document.getElementById('rename-cat-inp').addEventListener('keydown', e => {
 });
 
 // ─── HOVER PREVIEW DEL LIQUID GLASS ───────────────────────────────────────────
-import { lgShowPreview, lgHidePreview } from './animations.js';
 
 document.getElementById('cat-bar').addEventListener('mouseenter', e => {
   const btn = e.target.closest('.cat-btn');
