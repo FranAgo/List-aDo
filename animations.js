@@ -22,6 +22,7 @@ export const lgState = {
   currentRefrAnim: null,  // animación de lgRefraction — referencia para poder cancelarla
   switching:       false,
   previewActive:   false,
+  cur:             null,  // { x, y, w, h } — posición y tamaño actuales en JS puro
 };
 
 // ─── COMPATIBILIDAD: EXPORTS LEGACY ───────────────────────────────────────────
@@ -94,21 +95,7 @@ function applyRect(rect) {
   Object.assign(lgIndicator.style, pos);
 }
 
-// ─── MOVIMIENTO PRINCIPAL — TRANSFORM PURO, SIN FLIP, SIN LAYOUT ─────────────
-//
-// Arquitectura: el indicator vive SIEMPRE en left:0, top:0.
-// La posición visual se controla 100% por transform: translate(x,y).
-// El tamaño se anima también por transform: scaleX/scaleY relativo al tamaño base.
-// Beneficio: transform es composited → GPU → 60fps sin jank de layout.
-//
-// lgState guarda la posición y tamaño actuales como valores JS.
-// Al interrumpir una animación, leemos lgState (no el DOM) → siempre confiable.
-//
-// Para el tamaño variable entre botones (ancho distinto), usamos:
-//   scaleX = targetWidth / baseWidth
-//   scaleY = targetHeight / baseHeight
-// donde base = tamaño del primer botón (se fija en initDone).
-
+// ─── MOVIMIENTO PRINCIPAL ──────────────────────────────────────────────────────
 export function lgMoveTo(activeBtn) {
   if (!lgIndicator || !activeBtn) return;
 
@@ -117,22 +104,15 @@ export function lgMoveTo(activeBtn) {
   const destRect = getBtnRect(activeBtn);
   if (!destRect.width || !destRect.height) return;
 
-  // ── Primera vez: fijar posición base y tamaño base ────────────────────────
+  // ── Primera vez ───────────────────────────────────────────────────────────
   if (!lgState.initDone) {
-    // El indicator se posiciona en destRect via left/top/width/height
-    // (modo estático — sin transform). Guardamos como estado actual.
     applyColor(destBg, destBorder);
     applyRect(destRect);
     lgIndicator.style.transform = 'none';
     if (lgRefraction) lgRefraction.style.transform = 'none';
-    Object.assign(lgIndicator.style, { opacity: '1' });
+    lgIndicator.style.opacity = '1';
     if (lgRefraction) lgRefraction.style.opacity = '1';
-
-    // Estado de la posición actual en coordenadas JS puras
-    lgState.cur = {
-      x: destRect.left, y: destRect.top,
-      w: destRect.width, h: destRect.height,
-    };
+    lgState.cur = { x: destRect.left, y: destRect.top, w: destRect.width, h: destRect.height };
     lgState.currentBtn = activeBtn;
     lgState.initDone   = true;
     return;
@@ -140,68 +120,48 @@ export function lgMoveTo(activeBtn) {
 
   if (lgState.currentBtn === activeBtn) return;
 
-  // ── Capturar posición actual desde lgState.cur (siempre confiable) ────────
-  // Si hay animación en curso, lgState.cur refleja la posición en el momento
-  // en que empezó ese viaje — usamos eso como origen del próximo.
-  // Pero si podemos leer la posición interpolada actual (animación corriendo),
-  // es mejor partir desde ahí para continuidad visual.
-  let fromX, fromY, fromW, fromH;
+  // ── Leer origen desde lgState.cur ────────────────────────────────────────
+  // Si hay animación corriendo, leer la posición visual interpolada del transform.
+  // Para el tamaño usamos lgState.cur.w/h (sin distorsión de escala animada).
+  let fromX = lgState.cur?.x ?? destRect.left;
+  let fromY = lgState.cur?.y ?? destRect.top;
+  const fromW = lgState.cur?.w ?? destRect.width;
+  const fromH = lgState.cur?.h ?? destRect.height;
 
   if (lgState.currentAnim && lgState.currentAnim.playState === 'running') {
-    // Leer posición visual interpolada: el indicator tiene left/top fijos en cur.x/y
-    // y el transform animado. Leemos el transform computado para obtener el translate real.
     const matrix = new DOMMatrix(getComputedStyle(lgIndicator).transform);
     fromX = (lgState.cur?.x ?? destRect.left) + matrix.m41;
     fromY = (lgState.cur?.y ?? destRect.top)  + matrix.m42;
-    // Para el tamaño interpolado leemos scaleX/scaleY del matrix
-    const baseW = lgState.cur?.w ?? destRect.width;
-    const baseH = lgState.cur?.h ?? destRect.height;
-    fromW = baseW * Math.abs(matrix.m11);
-    fromH = baseH * Math.abs(matrix.m22);
-  } else {
-    fromX = lgState.cur?.x ?? destRect.left;
-    fromY = lgState.cur?.y ?? destRect.top;
-    fromW = lgState.cur?.w ?? destRect.width;
-    fromH = lgState.cur?.h ?? destRect.height;
+    // Nota: fromW/fromH intencionalmente NO se leen del matrix.m11/m22
+    // para evitar propagar distorsiones de elongación al próximo viaje.
   }
 
   // Cancelar animaciones previas
-  if (lgState.currentAnim) {
-    lgState.currentAnim.cancel();
-    lgState.currentAnim = null;
-  }
-  if (lgState.currentRefrAnim) {
-    lgState.currentRefrAnim.cancel();
-    lgState.currentRefrAnim = null;
-  }
+  if (lgState.currentAnim)     { lgState.currentAnim.cancel();     lgState.currentAnim     = null; }
+  if (lgState.currentRefrAnim) { lgState.currentRefrAnim.cancel(); lgState.currentRefrAnim = null; }
 
-  // Actualizar estado al nuevo destino
-  lgState.cur = {
-    x: destRect.left, y: destRect.top,
-    w: destRect.width, h: destRect.height,
-  };
+  // Guardar nuevo destino como estado
+  lgState.cur        = { x: destRect.left, y: destRect.top, w: destRect.width, h: destRect.height };
   lgState.currentBtn = activeBtn;
 
-  // ── Posicionar el indicator en el origen (sin transform) ──────────────────
-  // left/top/width/height se fijan al origen. El transform hace el viaje.
+  // ── Posicionar en origen con tamaño DESTINO ───────────────────────────────
+  // El cambio de tamaño ocurre aquí, cubierto por la compresión inicial (scale 0.86).
+  // El usuario no lo percibe porque la gota arranca achicada de todas formas.
+  // Esto elimina el salto de tamaño en onfinish.
   Object.assign(lgIndicator.style, {
-    left:      fromX + 'px',
-    top:       fromY + 'px',
-    width:     fromW + 'px',
-    height:    fromH + 'px',
+    left: fromX + 'px', top: fromY + 'px',
+    width: destRect.width + 'px', height: destRect.height + 'px',
     transform: 'none',
   });
   if (lgRefraction) {
     Object.assign(lgRefraction.style, {
-      left:      fromX + 'px',
-      top:       fromY + 'px',
-      width:     fromW + 'px',
-      height:    fromH + 'px',
+      left: fromX + 'px', top: fromY + 'px',
+      width: destRect.width + 'px', height: destRect.height + 'px',
       transform: 'none',
     });
   }
 
-  // ── Reduced motion: salto directo ─────────────────────────────────────────
+  // Reduced motion
   if (prefersReduced) {
     applyColor(destBg, destBorder);
     applyRect(destRect);
@@ -211,103 +171,63 @@ export function lgMoveTo(activeBtn) {
   const fromBg     = readCurrentBg();
   const fromBorder = readCurrentBorder();
 
-  // Deltas de posición y tamaño para los keyframes
-  const dx = destRect.left  - fromX;
-  const dy = destRect.top   - fromY;
+  const dx = destRect.left - fromX;
+  const dy = destRect.top  - fromY;
   const isHorizontal = Math.abs(dx) >= Math.abs(dy);
 
-  // Ratios de tamaño destino/origen — el scaleX/Y final tiene que llegar a estos valores
-  // para que el tamaño viaje junto con la posición, sin salto al finalizar.
-  // Guard contra división por cero: fromW/fromH nunca deberían ser 0 en runtime normal,
-  // pero si ocurre (race condition en boot) fallback a 1.
-  const scaleXFinal = fromW > 0 ? destRect.width  / fromW : 1;
-  const scaleYFinal = fromH > 0 ? destRect.height / fromH : 1;
-
-  // Elongación física: escala intermedia que estira la gota en la dirección del viaje.
-  // Se aplica multiplicada sobre el ratio final para que la elongación sea coherente.
-  const STRETCH = 1.16;
-  const SQUEEZE = 0.88;
-  const elongSX = isHorizontal ? scaleXFinal * STRETCH : scaleXFinal * SQUEEZE;
-  const elongSY = isHorizontal ? scaleYFinal * SQUEEZE : scaleYFinal * STRETCH;
-
-  // Compresión inicial: se aplica uniformemente sobre el ratio de tamaño también
-  const compressSX = scaleXFinal * 0.86;
-  const compressSY = scaleYFinal * 0.86;
-
-  // Rebote: leve overshoot sobre el ratio final
-  const bounceSX1 = scaleXFinal * 1.055;
-  const bounceSY1 = scaleYFinal * 0.945;
-  const bounceSX2 = scaleXFinal * 0.975;
-  const bounceSY2 = scaleYFinal * 1.025;
-
-  // Overshoot de posición: la gota se pasa del destino en la dirección del viaje,
-  // luego vuelve suavemente. El delta es proporcional a la distancia recorrida,
-  // pero acotado para que no sea exagerado en viajes largos.
+  // Overshoot proporcional a la distancia, máx 8px
   const dist      = Math.sqrt(dx * dx + dy * dy);
-  const overshoot = Math.min(dist * 0.08, 10); // máx 10px de pasada
-  const ovX = dist > 0 ? (dx / dist) * overshoot : 0;
-  const ovY = dist > 0 ? (dy / dist) * overshoot : 0;
+  const ovAmt     = Math.min(dist * 0.07, 8);
+  const ovX       = dist > 0 ? (dx / dist) * ovAmt : 0;
+  const ovY       = dist > 0 ? (dy / dist) * ovAmt : 0;
 
-  const DUR = 500;
+  // Elongación: solo en el eje del movimiento, relativa a 1 (no al ratio de tamaño)
+  const elongSX = isHorizontal ? 1.14 : 0.90;
+  const elongSY = isHorizontal ? 0.90 : 1.14;
 
-  // ── Keyframes: translate(dx,dy) + scaleX/Y que incluyen el ratio de tamaño ──
-  // Beneficio: el tamaño viaja en el GPU junto con la posición.
-  // Al llegar, onfinish hace applyRect(destRect) + transform:none — sin salto visible
-  // porque el transform ya llegó al tamaño correcto en el último keyframe.
+  const DUR = 480;
 
+  // Keyframes: scaleX/Y siempre relativo a 1 (el indicator ya está en tamaño destino).
+  // translate lleva de fromX/fromY → destX/destY con overshoot físico.
   const anim = lgIndicator.animate([
     {
-      // t=0: origen, shape comprimida uniformemente
-      transform: `translate(0px, 0px) scaleX(${(scaleXFinal * 0.92).toFixed(4)}) scaleY(${(scaleYFinal * 0.92).toFixed(4)})`,
+      // Origen: comprimido. La compresión tapa el cambio de tamaño/posición de arriba.
+      transform: 'translate(0px, 0px) scale(0.86)',
       offset: 0,
-      easing: 'cubic-bezier(0.3, 0, 0.08, 1)',
+      easing: 'cubic-bezier(0.12, 0, 0.0, 1)',
     },
     {
-      // t=0.08: compresión máxima — la gota se achica antes de despegar
-      transform: `translate(0px, 0px) scaleX(${compressSX.toFixed(4)}) scaleY(${compressSY.toFixed(4)})`,
-      offset: 0.08,
-      easing: 'cubic-bezier(0.08, 0, 0.0, 1)',
+      // Mitad del viaje: elongado en la dirección del movimiento
+      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX}) scaleY(${elongSY})`,
+      offset: 0.46,
+      easing: 'cubic-bezier(0.0, 0, 0.1, 1)',
     },
     {
-      // t=0.44: mitad del viaje — elongada en la dirección del movimiento
-      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX.toFixed(4)}) scaleY(${elongSY.toFixed(4)})`,
-      offset: 0.44,
-      easing: 'cubic-bezier(0.0, 0, 0.08, 1)',
+      // Overshoot: se pasa del destino
+      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.04) scaleY(0.96)`,
+      offset: 0.76,
+      easing: 'cubic-bezier(0.3, 0, 0.3, 1)',
     },
     {
-      // t=0.74: overshoot — la gota se pasa del destino en la dirección del viaje
-      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(${bounceSX1.toFixed(4)}) scaleY(${bounceSY1.toFixed(4)})`,
-      offset: 0.74,
-      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
-    },
-    {
-      // t=0.88: rebote inverso — vuelve levemente del otro lado
-      transform: `translate(${(dx - ovX * 0.3).toFixed(2)}px, ${(dy - ovY * 0.3).toFixed(2)}px) scaleX(${bounceSX2.toFixed(4)}) scaleY(${bounceSY2.toFixed(4)})`,
-      offset: 0.88,
-      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
-    },
-    {
-      // t=1: posición y tamaño finales exactos — sin salto en onfinish
-      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${scaleXFinal.toFixed(4)}) scaleY(${scaleYFinal.toFixed(4)})`,
+      // Asentamiento: posición y escala finales exactas
+      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,
       offset: 1.00,
     },
   ], { duration: DUR, fill: 'none' });
 
   lgState.currentAnim = anim;
 
-  // ── lgRefraction: misma trayectoria de posición + escala de tamaño ──────
+  // lgRefraction: misma trayectoria, sin rebote de escala
   if (lgRefraction) {
     const refrAnim = lgRefraction.animate([
-      { transform: `translate(0px, 0px) scaleX(${(scaleXFinal * 0.92).toFixed(4)}) scaleY(${(scaleYFinal * 0.92).toFixed(4)})`,                                          offset: 0,    easing: 'cubic-bezier(0.08, 0, 0.0, 1)' },
-      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX.toFixed(4)}) scaleY(${elongSY.toFixed(4)})`,                      offset: 0.44, easing: 'cubic-bezier(0.0, 0, 0.08, 1)' },
-      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${scaleXFinal.toFixed(4)}) scaleY(${scaleYFinal.toFixed(4)})`,                               offset: 0.82 },
-      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${scaleXFinal.toFixed(4)}) scaleY(${scaleYFinal.toFixed(4)})`,                               offset: 1.00 },
+      { transform: 'translate(0px, 0px) scale(0.86)',                                                                                          offset: 0,    easing: 'cubic-bezier(0.12, 0, 0.0, 1)' },
+      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX}) scaleY(${elongSY})`,                 offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.1, 1)'  },
+      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                               offset: 1.00 },
     ], { duration: DUR, fill: 'none' });
 
     lgState.currentRefrAnim = refrAnim;
     refrAnim.onfinish = () => {
       if (lgState.currentRefrAnim === refrAnim) lgState.currentRefrAnim = null;
-      applyRect(destRect);
       lgRefraction.style.transform = 'none';
     };
     refrAnim.oncancel = () => {
@@ -316,24 +236,50 @@ export function lgMoveTo(activeBtn) {
     };
   }
 
-  // ── Interpolación de color ────────────────────────────────────────────────
+  // Color interpolation
   const midBg     = 'rgba(255,255,255,0.16)';
   const midBorder = 'rgba(255,255,255,0.40)';
   const t0 = performance.now();
-
   function colorFrame(now) {
     const ps = anim.playState;
     if (ps === 'finished' || ps === 'idle') { applyColor(destBg, destBorder); return; }
     const t = Math.min((now - t0) / DUR, 1);
     let bg, border;
-    if (t < 0.42) {
-      const p = t / 0.42;
+    if (t < 0.46) {
+      const p = t / 0.46;
       bg = lerpColor(fromBg, midBg, p); border = lerpColor(fromBorder, midBorder, p);
-    } else if (t < 0.60) {
+    } else if (t < 0.62) {
       bg = midBg; border = midBorder;
     } else {
-      const p = (t - 0.60) / 0.40;
+      const p = (t - 0.62) / 0.38;
       bg = lerpColor(midBg, destBg, p); border = lerpColor(midBorder, destBorder, p);
+    }
+    applyColor(bg, border);
+    if (t < 1) requestAnimationFrame(colorFrame);
+  }
+  requestAnimationFrame(colorFrame);
+
+  anim.onfinish = () => {
+    if (lgState.currentAnim === anim) lgState.currentAnim = null;
+    applyColor(destBg, destBorder);
+    // El tamaño ya está correcto (se fijó al inicio del viaje).
+    // Solo actualizamos left/top y limpiamos transform.
+    lgIndicator.style.left      = destRect.left + 'px';
+    lgIndicator.style.top       = destRect.top  + 'px';
+    lgIndicator.style.transform = 'none';
+    if (lgRefraction) {
+      lgRefraction.style.left      = destRect.left + 'px';
+      lgRefraction.style.top       = destRect.top  + 'px';
+      lgRefraction.style.transform = 'none';
+    }
+  };
+
+  anim.oncancel = () => {
+    lgIndicator.style.transform = 'none';
+    if (lgRefraction) lgRefraction.style.transform = 'none';
+  };
+}
+
     }
     applyColor(bg, border);
     if (t < 1) requestAnimationFrame(colorFrame);
