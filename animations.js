@@ -107,6 +107,7 @@ export function lgMoveTo(activeBtn) {
   if (!lgState.initDone) {
     applyColor(destBg, destBorder);
     applyRect(destRect);
+    lgState.fromRect = { ...destRect };
     Object.assign(lgIndicator.style, { opacity: '1', transform: 'none' });
     if (lgRefraction) Object.assign(lgRefraction.style, { opacity: '1', transform: 'none' });
     lgState.currentBtn = activeBtn;
@@ -116,8 +117,31 @@ export function lgMoveTo(activeBtn) {
 
   if (lgState.currentBtn === activeBtn) return;
 
-  // Cancelar animación previa limpiamente
+  // ── Leer posición de origen desde lgState.fromRect ───────────────────────
+  // lgState.fromRect se guarda al final de cada animación y en el primer render.
+  // Es la única fuente confiable del origen — no depende del DOM ni de transforms.
+  // Cuando hay una animación interrumpida, capturamos la posición visual real
+  // ANTES de cancelar, y la guardamos como nuevo origen.
+  let fromRect = lgState.fromRect
+    ? { ...lgState.fromRect }
+    : {
+        left:   parseFloat(lgIndicator.style.left)   || destRect.left,
+        top:    parseFloat(lgIndicator.style.top)    || destRect.top,
+        width:  parseFloat(lgIndicator.style.width)  || destRect.width,
+        height: parseFloat(lgIndicator.style.height) || destRect.height,
+      };
+
   if (lgState.currentAnim) {
+    // Animación en curso: leer posición visual real para partir desde ahí
+    const catBar  = document.getElementById('cat-bar');
+    const barOff  = catBar ? catBar.getBoundingClientRect() : { left: 0, top: 0 };
+    const indOff  = lgIndicator.getBoundingClientRect();
+    fromRect = {
+      left:   indOff.left - barOff.left,
+      top:    indOff.top  - barOff.top,
+      width:  indOff.width,
+      height: indOff.height,
+    };
     lgState.currentAnim.cancel();
     lgState.currentAnim = null;
   }
@@ -125,155 +149,149 @@ export function lgMoveTo(activeBtn) {
     lgState.currentRefrAnim.cancel();
     lgState.currentRefrAnim = null;
   }
+
+  // Limpiar transforms residuales
   lgIndicator.style.transform = 'none';
+  if (lgRefraction) lgRefraction.style.transform = 'none';
 
   // ── Reduced motion: salto directo ─────────────────────────────────────────
   if (prefersReduced) {
     applyColor(destBg, destBorder);
     applyRect(destRect);
-    if (lgRefraction) lgRefraction.style.transform = 'none';
+    lgState.fromRect   = { ...destRect };
     lgState.currentBtn = activeBtn;
     return;
   }
 
-  // ── Leer posición visual actual ANTES de cualquier mutación ──────────────
-  // getBoundingClientRect() devuelve la posición visual real en pantalla,
-  // incluyendo cualquier transform activo. Esto es crítico cuando se interrumpe
-  // una animación en curso: style.left apunta al destino anterior, no al visual.
   const fromBg     = readCurrentBg();
   const fromBorder = readCurrentBorder();
 
-  const catBar     = document.getElementById('cat-bar');
-  const barRect    = catBar ? catBar.getBoundingClientRect() : { left: 0, top: 0 };
-  const indRect    = lgIndicator.getBoundingClientRect();
-
-  // Posición del indicator en coordenadas relativas al cat-bar
-  const fromLeft = indRect.left - barRect.left;
-  const fromTop  = indRect.top  - barRect.top;
-  const fromW    = indRect.width;
-  const fromH    = indRect.height;
-
-  // Vector de desplazamiento para saber si el movimiento es horizontal o vertical
-  const dx = destRect.left - fromLeft;
-  const dy = destRect.top  - fromTop;
+  // Dirección del viaje para la elongación
+  const dx = destRect.left - fromRect.left;
+  const dy = destRect.top  - fromRect.top;
   const isHorizontal = Math.abs(dx) >= Math.abs(dy);
+  const STRETCH = 1.22;
+  const SQUEEZE = 0.84;
+  const elongScaleX = isHorizontal ? STRETCH : SQUEEZE;
+  const elongScaleY = isHorizontal ? SQUEEZE : STRETCH;
 
-  // Elongación: la gota se estira en la dirección del movimiento.
-  // scaleX mayor si viaja horizontal, scaleY mayor si viaja vertical.
-  const ELONGATION_AXIS   = 1.28;  // eje del movimiento: se estira
-  const ELONGATION_CROSS  = 0.82;  // eje perpendicular: se comprime (conservación de volumen)
-  const elongScaleX = isHorizontal ? ELONGATION_AXIS : ELONGATION_CROSS;
-  const elongScaleY = isHorizontal ? ELONGATION_CROSS : ELONGATION_AXIS;
-
-  // Mover el rect al destino antes de animar (técnica FLIP)
-  applyRect(destRect);
+  // Guardar destino como próximo origen
+  lgState.fromRect   = { ...destRect };
   lgState.currentBtn = activeBtn;
 
-  // ── Keyframes de las 4 fases ──────────────────────────────────────────────
-  //
-  //  0.00 → 0.12 : FASE 1 — Compresión. La gota se achica como al ser presionada.
-  //  0.12 → 0.70 : FASE 2 — Elongación + viaje. Se estira en la dirección del vector.
-  //  0.70 → 0.88 : FASE 3 — Overshoot. Llega al destino y rebota levemente.
-  //  0.88 → 1.00 : FASE 4 — Asentamiento. Vuelve a escala 1 y activa los rims de lupa.
-  //
-  //  El truco FLIP: el indicator ya está en destRect.
-  //  Empezamos con un translate(dx, dy) que lo pone visualmente en el origen,
-  //  y animamos hacia translate(0,0). El scale va encima de eso.
+  // ── Posicionar el indicator en el origen visualmente antes de animar ──────
+  // Sin FLIP: el indicator arranca en fromRect y viaja a destRect
+  // animando left/top/width/height directamente.
+  // El transform maneja solo la escala (compresión, elongación, rebote) —
+  // siempre parte de none y vuelve a none, nunca contamina la lectura de origen.
+  Object.assign(lgIndicator.style, {
+    left:   fromRect.left   + 'px',
+    top:    fromRect.top    + 'px',
+    width:  fromRect.width  + 'px',
+    height: fromRect.height + 'px',
+  });
+  if (lgRefraction) {
+    Object.assign(lgRefraction.style, {
+      left:   fromRect.left   + 'px',
+      top:    fromRect.top    + 'px',
+      width:  fromRect.width  + 'px',
+      height: fromRect.height + 'px',
+    });
+  }
 
   const DUR = 480;
+  const midL = (fromRect.left   + destRect.left)   / 2;
+  const midT = (fromRect.top    + destRect.top)    / 2;
+  const midW = (fromRect.width  + destRect.width)  / 2;
+  const midH = (fromRect.height + destRect.height) / 2;
 
   const anim = lgIndicator.animate([
     {
-      // Posición visual: origen. Escala: comprimida (fase 1)
-      transform: `translate(${dx}px, ${dy}px) scaleX(${fromW / destRect.width * 0.88}) scaleY(${fromH / destRect.height * 0.88})`,
-      offset:    0,
-      easing:    'cubic-bezier(0.4, 0, 0.2, 1)',
+      left: fromRect.left + 'px', top: fromRect.top + 'px',
+      width: fromRect.width + 'px', height: fromRect.height + 'px',
+      transform: 'scale(0.88)',
+      offset: 0,
+      easing: 'cubic-bezier(0.4, 0, 0.1, 1)',
     },
     {
-      // Compresión máxima: la gota se achica antes de salir (offset 0.10)
-      transform: `translate(${dx * 0.95}px, ${dy * 0.95}px) scaleX(${fromW / destRect.width * 0.82}) scaleY(${fromH / destRect.height * 0.82})`,
-      offset:    0.10,
-      easing:    'cubic-bezier(0.2, 0, 0.0, 1)',
+      left: fromRect.left + 'px', top: fromRect.top + 'px',
+      width: fromRect.width + 'px', height: fromRect.height + 'px',
+      transform: 'scale(0.82)',
+      offset: 0.08,
+      easing: 'cubic-bezier(0.1, 0, 0.0, 1)',
     },
     {
-      // Mitad del viaje: elongada en la dirección del movimiento
-      transform: `translate(${dx * 0.4}px, ${dy * 0.4}px) scaleX(${elongScaleX}) scaleY(${elongScaleY})`,
-      offset:    0.45,
-      easing:    'cubic-bezier(0.0, 0, 0.2, 1)',
+      left: midL + 'px', top: midT + 'px',
+      width: midW + 'px', height: midH + 'px',
+      transform: `scaleX(${elongScaleX}) scaleY(${elongScaleY})`,
+      offset: 0.45,
+      easing: 'cubic-bezier(0.0, 0, 0.15, 1)',
     },
     {
-      // Llegada: overshoot leve (rebote)
-      transform: `translate(0px, 0px) scaleX(1.06) scaleY(0.94)`,
-      offset:    0.72,
-      easing:    'cubic-bezier(0.34, 1.56, 0.64, 1)',
+      left: destRect.left + 'px', top: destRect.top + 'px',
+      width: destRect.width + 'px', height: destRect.height + 'px',
+      transform: 'scaleX(1.07) scaleY(0.93)',
+      offset: 0.74,
+      easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
     },
     {
-      // Rebote inverso suave
-      transform: `translate(0px, 0px) scaleX(0.97) scaleY(1.03)`,
-      offset:    0.88,
-      easing:    'cubic-bezier(0.25, 0.8, 0.25, 1)',
+      left: destRect.left + 'px', top: destRect.top + 'px',
+      width: destRect.width + 'px', height: destRect.height + 'px',
+      transform: 'scaleX(0.97) scaleY(1.03)',
+      offset: 0.88,
+      easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // Asentamiento final: escala 1 exacta
-      transform: `translate(0px, 0px) scale(1)`,
-      offset:    1.00,
+      left: destRect.left + 'px', top: destRect.top + 'px',
+      width: destRect.width + 'px', height: destRect.height + 'px',
+      transform: 'scale(1)',
+      offset: 1.00,
     },
   ], { duration: DUR, fill: 'none' });
 
   lgState.currentAnim = anim;
 
-  // ── Interpolación de color durante el viaje ───────────────────────────────
-  // Pico de blanco al cruzar la mitad → da sensación de "destello" de movimiento
+  // ── Interpolación de color ────────────────────────────────────────────────
   const midBg     = 'rgba(255,255,255,0.16)';
   const midBorder = 'rgba(255,255,255,0.40)';
   const t0 = performance.now();
 
   function colorFrame(now) {
-    const playState = anim.playState;
-    if (playState === 'finished' || playState === 'idle') {
-      applyColor(destBg, destBorder);
-      return;
-    }
+    const ps = anim.playState;
+    if (ps === 'finished' || ps === 'idle') { applyColor(destBg, destBorder); return; }
     const t = Math.min((now - t0) / DUR, 1);
     let bg, border;
     if (t < 0.45) {
       const p = t / 0.45;
-      bg     = lerpColor(fromBg, midBg, p);
-      border = lerpColor(fromBorder, midBorder, p);
+      bg = lerpColor(fromBg, midBg, p); border = lerpColor(fromBorder, midBorder, p);
     } else if (t < 0.60) {
-      bg     = midBg;
-      border = midBorder;
+      bg = midBg; border = midBorder;
     } else {
       const p = (t - 0.60) / 0.40;
-      bg     = lerpColor(midBg, destBg, p);
-      border = lerpColor(midBorder, destBorder, p);
+      bg = lerpColor(midBg, destBg, p); border = lerpColor(midBorder, destBorder, p);
     }
     applyColor(bg, border);
     if (t < 1) requestAnimationFrame(colorFrame);
   }
   requestAnimationFrame(colorFrame);
 
-  // ── Sincronizar lgRefraction con el mismo movimiento ─────────────────────
-  // lgRefraction sigue al indicator pero con un delay mínimo para que el blur
-  // no corte el contenido durante la compresión inicial.
-  // Se guarda en lgState.currentRefrAnim para poder cancelarlo en clicks rápidos.
+  // ── lgRefraction: misma trayectoria de posición, sin escala ───────────────
   if (lgRefraction) {
     const refrAnim = lgRefraction.animate([
-      { transform: `translate(${dx}px, ${dy}px)`, offset: 0, easing: 'cubic-bezier(0.2, 0, 0.0, 1)' },
-      { transform: `translate(${dx * 0.4}px, ${dy * 0.4}px)`, offset: 0.45, easing: 'cubic-bezier(0.0, 0, 0.2, 1)' },
-      { transform: 'translate(0px, 0px)', offset: 0.78 },
-      { transform: 'translate(0px, 0px)', offset: 1.00 },
-    ], { duration: DUR, fill: 'none', delay: 40 });
+      { left: fromRect.left + 'px', top: fromRect.top + 'px', width: fromRect.width + 'px', height: fromRect.height + 'px', offset: 0,    easing: 'cubic-bezier(0.1, 0, 0.0, 1)' },
+      { left: midL + 'px', top: midT + 'px', width: midW + 'px', height: midH + 'px',                                       offset: 0.45, easing: 'cubic-bezier(0.0, 0, 0.2, 1)' },
+      { left: destRect.left + 'px', top: destRect.top + 'px', width: destRect.width + 'px', height: destRect.height + 'px', offset: 0.80 },
+      { left: destRect.left + 'px', top: destRect.top + 'px', width: destRect.width + 'px', height: destRect.height + 'px', offset: 1.00 },
+    ], { duration: DUR, fill: 'none' });
 
     lgState.currentRefrAnim = refrAnim;
 
     refrAnim.onfinish = () => {
       if (lgState.currentRefrAnim === refrAnim) lgState.currentRefrAnim = null;
-      lgRefraction.style.transform = 'none';
+      applyRect(destRect);
     };
     refrAnim.oncancel = () => {
       if (lgState.currentRefrAnim === refrAnim) lgState.currentRefrAnim = null;
-      lgRefraction.style.transform = 'none';
     };
   }
 
@@ -281,12 +299,10 @@ export function lgMoveTo(activeBtn) {
     if (lgState.currentAnim === anim) lgState.currentAnim = null;
     applyColor(destBg, destBorder);
     lgIndicator.style.transform = 'none';
-    lgIndicator.style.width     = destRect.width  + 'px';
-    lgIndicator.style.height    = destRect.height + 'px';
+    applyRect(destRect);
     if (lgRefraction) {
       lgRefraction.style.transform = 'none';
-      lgRefraction.style.width     = destRect.width  + 'px';
-      lgRefraction.style.height    = destRect.height + 'px';
+      applyRect(destRect);
     }
   };
 
