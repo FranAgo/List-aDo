@@ -9,7 +9,7 @@ import { renderCatBar, renderView, updateStats,
          showToast, showToastUndo, showToastConfirm,
          commitPendingUndo, taskHTML, esc }   from './ui.js';
 import { spawnConfetti, playCompleteSound,
-         lgCurrentAnim, setLgCurrentAnim,
+         lgState,
          lgIndicator, lgSyncWithActiveBtn,
          lgStartObserving,
          setLgInitDone, setLgCurrentBtn }     from './animations.js';
@@ -185,7 +185,7 @@ export function setupDrag(listEl, cat) {
       state.dragSrcId = card.dataset.id;
       setTimeout(() => card.classList.add('dragging'), 0);
       e.dataTransfer.effectAllowed = 'move';
-      if (lgCurrentAnim) { lgCurrentAnim.cancel(); setLgCurrentAnim(null); }
+      if (lgState.currentAnim) { lgState.currentAnim.cancel(); lgState.currentAnim = null; }
       lgIndicator.style.transform = 'none';
     });
     card.addEventListener('dragend', () => {

@@ -145,6 +145,12 @@ body {
   box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+/* Suprime el botón nativo de mostrar contraseña en Edge/IE —
+   evita que aparezca un segundo ojo junto al nuestro */
+.login-input::-ms-reveal {
+  display: none;
+}
+
 .login-btn {
   width: 100%;
   background: var(--accent);
