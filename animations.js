@@ -187,7 +187,7 @@ export function lgMoveTo(activeBtn) {
   const midSX = destRect.width  > 0 ? midW / destRect.width  : 1;
   const midSY = destRect.height > 0 ? midH / destRect.height : 1;
 
-  const DUR = 560;
+  const DUR = 700;
 
   // Física de slime/gelatina — 5 fases:
   //   t=0.00 → escala 1 (estado actual)
@@ -260,25 +260,17 @@ export function lgMoveTo(activeBtn) {
     };
   }
 
-  // Color interpolation
-  const midBg     = 'rgba(255,255,255,0.16)';
-  const midBorder = 'rgba(255,255,255,0.40)';
+  // Color: interpolación directa fromBg → destBg a lo largo del viaje.
+  // El color intermedio es el promedio real entre los dos colores de categoría,
+  // sin pico blanco artificial. Se sincroniza con la posición (t=0.46 = mitad).
   const t0 = performance.now();
   function colorFrame(now) {
     const ps = anim.playState;
     if (ps === 'finished' || ps === 'idle') { applyColor(destBg, destBorder); return; }
     const t = Math.min((now - t0) / DUR, 1);
-    let bg, border;
-    if (t < 0.46) {
-      const p = t / 0.46;
-      bg = lerpColor(fromBg, midBg, p); border = lerpColor(fromBorder, midBorder, p);
-    } else if (t < 0.62) {
-      bg = midBg; border = midBorder;
-    } else {
-      const p = (t - 0.62) / 0.38;
-      bg = lerpColor(midBg, destBg, p); border = lerpColor(midBorder, destBorder, p);
-    }
-    applyColor(bg, border);
+    // Easing suave para que el color llegue un poco después que la posición
+    const p = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2; // ease-in-out cuadrático
+    applyColor(lerpColor(fromBg, destBg, p), lerpColor(fromBorder, destBorder, p));
     if (t < 1) requestAnimationFrame(colorFrame);
   }
   requestAnimationFrame(colorFrame);
