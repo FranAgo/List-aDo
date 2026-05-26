@@ -216,68 +216,84 @@ export function lgMoveTo(activeBtn) {
   const dy = destRect.top   - fromY;
   const isHorizontal = Math.abs(dx) >= Math.abs(dy);
 
-  // Elongación física: la gota se estira en la dirección del viaje
-  const STRETCH = 1.18;
-  const SQUEEZE = 0.86;
-  const elongSX = isHorizontal ? STRETCH : SQUEEZE;
-  const elongSY = isHorizontal ? SQUEEZE : STRETCH;
+  // Ratios de tamaño destino/origen — el scaleX/Y final tiene que llegar a estos valores
+  // para que el tamaño viaje junto con la posición, sin salto al finalizar.
+  // Guard contra división por cero: fromW/fromH nunca deberían ser 0 en runtime normal,
+  // pero si ocurre (race condition en boot) fallback a 1.
+  const scaleXFinal = fromW > 0 ? destRect.width  / fromW : 1;
+  const scaleYFinal = fromH > 0 ? destRect.height / fromH : 1;
 
-  const DUR = 520;
+  // Elongación física: escala intermedia que estira la gota en la dirección del viaje.
+  // Se aplica multiplicada sobre el ratio final para que la elongación sea coherente.
+  const STRETCH = 1.16;
+  const SQUEEZE = 0.88;
+  const elongSX = isHorizontal ? scaleXFinal * STRETCH : scaleXFinal * SQUEEZE;
+  const elongSY = isHorizontal ? scaleYFinal * SQUEEZE : scaleYFinal * STRETCH;
 
-  // ── Keyframes: translate(dx,dy) + scale sobre el origen ───────────────────
-  // En cada keyframe, translate lleva visualmente al punto correcto de la trayectoria
-  // y scale modula la forma (compresión → elongación → rebote).
-  // Al final: translate(dx,dy) scale(1) → el indicator está visualmente en destino.
-  // Luego onfinish fija left/top/width/height al destino y resetea transform.
+  // Compresión inicial: se aplica uniformemente sobre el ratio de tamaño también
+  const compressSX = scaleXFinal * 0.86;
+  const compressSY = scaleYFinal * 0.86;
+
+  // Rebote: leve overshoot sobre el ratio final
+  const bounceSX1 = scaleXFinal * 1.055;
+  const bounceSY1 = scaleYFinal * 0.945;
+  const bounceSX2 = scaleXFinal * 0.975;
+  const bounceSY2 = scaleYFinal * 1.025;
+
+  const DUR = 500;
+
+  // ── Keyframes: translate(dx,dy) + scaleX/Y que incluyen el ratio de tamaño ──
+  // Beneficio: el tamaño viaja en el GPU junto con la posición.
+  // Al llegar, onfinish hace applyRect(destRect) + transform:none — sin salto visible
+  // porque el transform ya llegó al tamaño correcto en el último keyframe.
 
   const anim = lgIndicator.animate([
     {
-      // t=0: posición origen, levemente comprimido (se está "presionando")
-      transform: 'translate(0px, 0px) scale(0.92)',
+      // t=0: origen, shape comprimida uniformemente
+      transform: `translate(0px, 0px) scaleX(${(scaleXFinal * 0.92).toFixed(4)}) scaleY(${(scaleYFinal * 0.92).toFixed(4)})`,
       offset: 0,
-      easing: 'cubic-bezier(0.3, 0, 0.1, 1)',
+      easing: 'cubic-bezier(0.3, 0, 0.08, 1)',
     },
     {
       // t=0.08: compresión máxima — la gota se achica antes de despegar
-      transform: 'translate(0px, 0px) scale(0.86)',
+      transform: `translate(0px, 0px) scaleX(${compressSX.toFixed(4)}) scaleY(${compressSY.toFixed(4)})`,
       offset: 0.08,
-      easing: 'cubic-bezier(0.12, 0, 0.0, 1)',
+      easing: 'cubic-bezier(0.08, 0, 0.0, 1)',
     },
     {
-      // t=0.42: mitad del viaje — elongada en la dirección del movimiento
-      // translate interpolado al 50% de dx/dy + corrección de tamaño
-      transform: `translate(${dx * 0.5}px, ${dy * 0.5}px) scaleX(${elongSX}) scaleY(${elongSY})`,
-      offset: 0.42,
-      easing: 'cubic-bezier(0.0, 0, 0.1, 1)',
+      // t=0.44: mitad del viaje — elongada en la dirección del movimiento
+      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX.toFixed(4)}) scaleY(${elongSY.toFixed(4)})`,
+      offset: 0.44,
+      easing: 'cubic-bezier(0.0, 0, 0.08, 1)',
     },
     {
-      // t=0.75: llegó — overshoot lateral leve (rebote de gota)
-      transform: `translate(${dx}px, ${dy}px) scaleX(1.06) scaleY(0.94)`,
-      offset: 0.75,
-      easing: 'cubic-bezier(0.34, 1.5, 0.64, 1)',
+      // t=0.76: llegó — overshoot leve (rebote de gota al posarse)
+      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${bounceSX1.toFixed(4)}) scaleY(${bounceSY1.toFixed(4)})`,
+      offset: 0.76,
+      easing: 'cubic-bezier(0.34, 1.4, 0.64, 1)',
     },
     {
       // t=0.90: rebote inverso suave
-      transform: `translate(${dx}px, ${dy}px) scaleX(0.97) scaleY(1.03)`,
+      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${bounceSX2.toFixed(4)}) scaleY(${bounceSY2.toFixed(4)})`,
       offset: 0.90,
       easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // t=1: asentado en destino, escala exacta
-      transform: `translate(${dx}px, ${dy}px) scale(1)`,
+      // t=1: tamaño y posición finales exactos — sin salto en onfinish
+      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${scaleXFinal.toFixed(4)}) scaleY(${scaleYFinal.toFixed(4)})`,
       offset: 1.00,
     },
   ], { duration: DUR, fill: 'none' });
 
   lgState.currentAnim = anim;
 
-  // ── lgRefraction: misma trayectoria sin escala ────────────────────────────
+  // ── lgRefraction: misma trayectoria de posición + escala de tamaño ──────
   if (lgRefraction) {
     const refrAnim = lgRefraction.animate([
-      { transform: 'translate(0px, 0px)',                                                           offset: 0,    easing: 'cubic-bezier(0.12, 0, 0.0, 1)' },
-      { transform: `translate(${dx * 0.5}px, ${dy * 0.5}px)`,            offset: 0.42, easing: 'cubic-bezier(0.0, 0, 0.1, 1)'  },
-      { transform: `translate(${dx}px, ${dy}px)`,                           offset: 0.80 },
-      { transform: `translate(${dx}px, ${dy}px)`,                           offset: 1.00 },
+      { transform: `translate(0px, 0px) scaleX(${(scaleXFinal * 0.92).toFixed(4)}) scaleY(${(scaleYFinal * 0.92).toFixed(4)})`,                                          offset: 0,    easing: 'cubic-bezier(0.08, 0, 0.0, 1)' },
+      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${elongSX.toFixed(4)}) scaleY(${elongSY.toFixed(4)})`,                      offset: 0.44, easing: 'cubic-bezier(0.0, 0, 0.08, 1)' },
+      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${scaleXFinal.toFixed(4)}) scaleY(${scaleYFinal.toFixed(4)})`,                               offset: 0.82 },
+      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(${scaleXFinal.toFixed(4)}) scaleY(${scaleYFinal.toFixed(4)})`,                               offset: 1.00 },
     ], { duration: DUR, fill: 'none' });
 
     lgState.currentRefrAnim = refrAnim;
