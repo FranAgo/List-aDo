@@ -68,11 +68,11 @@ function applyColor(bg, border) {
 }
 
 function readCurrentBg() {
-  return lgIndicator?.style.background || 'rgba(200,240,96,0.18)';
+  return lgIndicator?.style.background || 'rgba(180,180,180,0.13)';
 }
 
 function readCurrentBorder() {
-  return lgIndicator?.style.borderColor || 'rgba(200,240,96,0.35)';
+  return lgIndicator?.style.borderColor || 'rgba(200,200,200,0.30)';
 }
 
 function resolveColor(btn) {
@@ -85,8 +85,8 @@ function resolveColor(btn) {
     );
     return { bg, border: catColors[catName].border };
   }
-  // Color por defecto: acento verde de la app
-  return { bg: 'rgba(200,240,96,0.30)', border: 'rgba(200,240,96,0.55)' };
+  // Sin categoría (ej: "Tareas de hoy") → glass neutro gris, sin tinte de color
+  return { bg: 'rgba(180,180,180,0.13)', border: 'rgba(200,200,200,0.30)' };
 }
 
 // ─── APLICAR POSICIÓN AL DOM ───────────────────────────────────────────────────
