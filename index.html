@@ -62,22 +62,32 @@
       />
     </filter>
 
-    <!-- Lupa de borde: distorsión más agresiva para los 4 rims del indicador.
-         baseFrequency anisotrópica (más alta en Y) → curva el borde como una gota real.
-         scale="10" → efecto visible sin ser grotesco. -->
-    <filter id="lg-lens" x="-30%" y="-30%" width="160%" height="160%"
+    <!--
+      Lupa de gota de agua — mapa de desplazamiento radial.
+      Cómo funciona:
+        - feFlood + feComposite generan un disco sólido con forma de la gota.
+        - feGaussianBlur suaviza los bordes del disco → mapa de desplazamiento radial.
+        - feDisplacementMap usa el canal R (horizontal) y G (vertical) del mapa:
+            · En el centro del disco: gris 50% → sin desplazamiento (vidrio plano)
+            · En los bordes del disco: gradiente → desplaza los píxeles hacia adentro
+          El resultado es que el borde de la gota curva el contenido detrás,
+          igual que una lente convexa o una gota de agua real sobre texto.
+      scale="18": lensing visible sin ser grotesco.
+      Funciona solo en Chrome/Edge (backdrop-filter: url()). Safari ve solo blur.
+    -->
+    <filter id="lg-water-drop" x="-25%" y="-25%" width="150%" height="150%"
             color-interpolation-filters="sRGB">
-      <feTurbulence
-        type="turbulence"
-        baseFrequency="0.01 0.08"
-        numOctaves="1"
-        seed="4"
-        result="turbulence"
-      />
+      <!-- Paso 1: disco que representa la forma de la gota -->
+      <feFlood flood-color="rgb(128,128,0)" result="neutralFlood" />
+      <!-- Paso 2: máscara circular suave usando alpha del SourceGraphic -->
+      <feComposite in="neutralFlood" in2="SourceGraphic" operator="in" result="disc" />
+      <!-- Paso 3: suavizar el borde → crea el gradiente radial de desplazamiento -->
+      <feGaussianBlur in="disc" stdDeviation="8" result="softDisc" />
+      <!-- Paso 4: aplicar el mapa al backdrop para curvar el contenido detrás -->
       <feDisplacementMap
         in="SourceGraphic"
-        in2="turbulence"
-        scale="10"
+        in2="softDisc"
+        scale="18"
         xChannelSelector="R"
         yChannelSelector="G"
       />
@@ -124,15 +134,9 @@
          renderCatBar() los preserva al reescribir innerHTML. -->
     <div class="cat-bar" id="cat-bar">
       <div id="lg-refraction" aria-hidden="true"></div>
+      <div id="lg-lens-layer" aria-hidden="true"></div>
       <div id="lg-indicator" aria-hidden="true">
         <div id="lg-specular"></div>
-        <!-- 4 bordes de distorsión: backdrop-filter: url(#lg-lens) sobre cada rim.
-             Mismo approach que el glass-effect del ejemplo de referencia.
-             Producen el efecto de lupa en los bordes de la gota. -->
-        <div class="lg-rim lg-rim--top"></div>
-        <div class="lg-rim lg-rim--bottom"></div>
-        <div class="lg-rim lg-rim--left"></div>
-        <div class="lg-rim lg-rim--right"></div>
       </div>
       <div id="lg-preview" aria-hidden="true"></div>
     </div>

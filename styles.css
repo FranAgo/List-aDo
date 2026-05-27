@@ -1595,46 +1595,31 @@ body {
   border-radius: 0 0 20px 20px;
 }
 
-/* ── Capa 4: bordes de distorsión (efecto lupa de gota) ──────────────────── */
+/* ── Capa 2b: lupa de gota — displacement radial sobre todo el indicator ── */
 /*
-  Cuatro franjas posicionadas en los rims del indicador.
-  Cada una aplica el filtro #lg-lens via backdrop-filter.
-  Esto distorsiona el contenido detrás en los bordes → efecto de lupa de gota real.
-  El grosor (6px en horizontal, 8px en vertical) está calibrado para
-  ser visible pero sutil — una gota, no una lupa de laboratorio.
+  #lg-lens-layer cubre exactamente el mismo rect que #lg-indicator,
+  posicionado por JS en animations.js (ver lgMoveTo).
+  Aplica el filtro #lg-water-drop via backdrop-filter:
+    - El mapa radial desplaza los píxeles del contenido detrás hacia adentro
+      en los bordes, igual que una lente convexa o una gota de agua real.
+    - En Chrome/Edge: refracción real del contenido detrás.
+    - En Safari/Firefox: sin efecto visible (fallback graceful).
+  border-radius igual que #lg-indicator para confinar el clipping de backdrop.
+  overflow:hidden necesario para que backdrop-filter respete el border-radius.
 */
-.lg-rim {
+#lg-lens-layer {
   position: absolute;
-  border-radius: 9999px;
+  top: 0; left: 0;
+  width: 0; height: 0;
+  border-radius: 20px;
   pointer-events: none;
+  z-index: 12;
+  opacity: 0;
+  overflow: hidden;
 
-  /* Solo Chrome/Edge soporta backdrop-filter con url(). Safari ve nada (fallback graceful). */
-  -webkit-backdrop-filter: url(#lg-lens);
-  backdrop-filter: url(#lg-lens);
-}
-
-.lg-rim--top {
-  top: -3px;
-  left: 0; right: 0;
-  height: 8px;
-}
-
-.lg-rim--bottom {
-  bottom: -3px;
-  left: 0; right: 0;
-  height: 8px;
-}
-
-.lg-rim--left {
-  left: -3px;
-  top: 0; bottom: 0;
-  width: 6px;
-}
-
-.lg-rim--right {
-  right: -3px;
-  top: 0; bottom: 0;
-  width: 6px;
+  /* El filtro radial curva el contenido detrás como una gota de agua convexa */
+  -webkit-backdrop-filter: url(#lg-water-drop);
+  backdrop-filter: url(#lg-water-drop);
 }
 
 /* ── Z-index stack de botones ───────────────────────────────────────────── */

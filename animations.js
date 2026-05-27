@@ -11,6 +11,7 @@ import { catColors } from './storage.js';
 
 // ─── ELEMENTOS DOM ─────────────────────────────────────────────────────────────
 export const lgRefraction = document.getElementById('lg-refraction');
+export const lgLensLayer  = document.getElementById('lg-lens-layer');
 export const lgIndicator  = document.getElementById('lg-indicator');
 export const lgPreview    = document.getElementById('lg-preview');
 
@@ -92,6 +93,7 @@ function applyRect(rect) {
     height: rect.height + 'px',
   };
   if (lgRefraction) Object.assign(lgRefraction.style, pos);
+  if (lgLensLayer)  Object.assign(lgLensLayer.style, pos);
   Object.assign(lgIndicator.style, pos);
 }
 
@@ -110,8 +112,10 @@ export function lgMoveTo(activeBtn) {
     applyRect(destRect);
     lgIndicator.style.transform = 'none';
     if (lgRefraction) lgRefraction.style.transform = 'none';
+    if (lgLensLayer)  lgLensLayer.style.transform  = 'none';
     lgIndicator.style.opacity = '1';
     if (lgRefraction) lgRefraction.style.opacity = '1';
+    if (lgLensLayer)  lgLensLayer.style.opacity  = '1';
     lgState.cur = { x: destRect.left, y: destRect.top, w: destRect.width, h: destRect.height };
     lgState.currentBtn = activeBtn;
     lgState.initDone   = true;
@@ -155,6 +159,13 @@ export function lgMoveTo(activeBtn) {
   });
   if (lgRefraction) {
     Object.assign(lgRefraction.style, {
+      left: fromX + 'px', top: fromY + 'px',
+      width: destRect.width + 'px', height: destRect.height + 'px',
+      transform: 'none',
+    });
+  }
+  if (lgLensLayer) {
+    Object.assign(lgLensLayer.style, {
       left: fromX + 'px', top: fromY + 'px',
       width: destRect.width + 'px', height: destRect.height + 'px',
       transform: 'none',
@@ -237,26 +248,33 @@ export function lgMoveTo(activeBtn) {
   // Elevar z-index durante el viaje para pasar siempre por encima de los botones
   lgIndicator.style.zIndex = '20';
   if (lgRefraction) lgRefraction.style.zIndex = '19';
+  if (lgLensLayer)  lgLensLayer.style.zIndex  = '21';
 
   lgState.currentAnim = anim;
 
-  // lgRefraction: misma trayectoria, sin rebote de escala
+  // lgRefraction y lgLensLayer: misma trayectoria, sin rebote de escala
   if (lgRefraction) {
-    const refrAnim = lgRefraction.animate([
+    const refrKeyframes = [
       { transform: 'translate(0px, 0px) scale(0.88)',                                                                                                            offset: 0,    easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
       { transform: 'translate(0px, 0px) scaleX(1.18) scaleY(0.88)',                                                                                           offset: 0.12, easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
       { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,               offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)' },
       { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                                               offset: 1.00 },
-    ], { duration: DUR, fill: 'none' });
+    ];
+    const refrAnim = lgRefraction.animate(refrKeyframes, { duration: DUR, fill: 'none' });
+
+    // lgLensLayer sigue exactamente la misma trayectoria
+    if (lgLensLayer) lgLensLayer.animate(refrKeyframes, { duration: DUR, fill: 'none' });
 
     lgState.currentRefrAnim = refrAnim;
     refrAnim.onfinish = () => {
       if (lgState.currentRefrAnim === refrAnim) lgState.currentRefrAnim = null;
       lgRefraction.style.transform = 'none';
+      if (lgLensLayer) lgLensLayer.style.transform = 'none';
     };
     refrAnim.oncancel = () => {
       if (lgState.currentRefrAnim === refrAnim) lgState.currentRefrAnim = null;
       lgRefraction.style.transform = 'none';
+      if (lgLensLayer) lgLensLayer.style.transform = 'none';
     };
   }
 
@@ -288,6 +306,12 @@ export function lgMoveTo(activeBtn) {
       lgRefraction.style.transform = 'none';
       lgRefraction.style.zIndex    = '10';
     }
+    if (lgLensLayer) {
+      lgLensLayer.style.left      = destRect.left + 'px';
+      lgLensLayer.style.top       = destRect.top  + 'px';
+      lgLensLayer.style.transform = 'none';
+      lgLensLayer.style.zIndex    = '12';
+    }
   };
 
   anim.oncancel = () => {
@@ -296,6 +320,10 @@ export function lgMoveTo(activeBtn) {
     if (lgRefraction) {
       lgRefraction.style.transform = 'none';
       lgRefraction.style.zIndex    = '10';
+    }
+    if (lgLensLayer) {
+      lgLensLayer.style.transform = 'none';
+      lgLensLayer.style.zIndex    = '12';
     }
   };
 }
@@ -312,6 +340,7 @@ export function lgSyncWithActiveBtn() {
   if (!activeBtn) {
     if (lgIndicator)  lgIndicator.style.opacity  = '0';
     if (lgRefraction) lgRefraction.style.opacity = '0';
+    if (lgLensLayer)  lgLensLayer.style.opacity  = '0';
     catBar.classList.remove('lg-active');
     lgState.currentBtn = null;
     lgState.initDone   = false;
@@ -321,6 +350,7 @@ export function lgSyncWithActiveBtn() {
   catBar.classList.add('lg-active');
   if (lgIndicator)  lgIndicator.style.opacity  = '1';
   if (lgRefraction) lgRefraction.style.opacity = '1';
+  if (lgLensLayer)  lgLensLayer.style.opacity  = '1';
   lgMoveTo(activeBtn);
 }
 
