@@ -1531,6 +1531,7 @@ body {
   z-index: 11;
   opacity: 0;
   will-change: transform;
+  transform-origin: center center; /* explícito — el aplanamiento siempre desde el centro */
 
   /* overflow: visible para que la gota pueda exceder el contorno del botón */
   overflow: visible;
