@@ -148,29 +148,18 @@ export function lgMoveTo(activeBtn) {
   lgState.cur        = { x: destRect.left, y: destRect.top, w: destRect.width, h: destRect.height };
   lgState.currentBtn = activeBtn;
 
-  // ── Posicionar en origen con tamaño DESTINO ───────────────────────────────
-  // El cambio de tamaño ocurre aquí, cubierto por la compresión inicial (scale 0.86).
-  // El usuario no lo percibe porque la gota arranca achicada de todas formas.
-  // Esto elimina el salto de tamaño en onfinish.
-  Object.assign(lgIndicator.style, {
+  // ── Posicionar en origen con tamaño ORIGEN ──────────────────────────────
+  // La gota arranca con su tamaño actual (fromW x fromH).
+  // El ancho/alto se animan junto con el transform: la gota se expande
+  // solo al llegar al destino, no antes del viaje.
+  const originPos = {
     left: fromX + 'px', top: fromY + 'px',
-    width: destRect.width + 'px', height: destRect.height + 'px',
+    width: fromW + 'px', height: fromH + 'px',
     transform: 'none',
-  });
-  if (lgRefraction) {
-    Object.assign(lgRefraction.style, {
-      left: fromX + 'px', top: fromY + 'px',
-      width: destRect.width + 'px', height: destRect.height + 'px',
-      transform: 'none',
-    });
-  }
-  if (lgLensLayer) {
-    Object.assign(lgLensLayer.style, {
-      left: fromX + 'px', top: fromY + 'px',
-      width: destRect.width + 'px', height: destRect.height + 'px',
-      transform: 'none',
-    });
-  }
+  };
+  Object.assign(lgIndicator.style, originPos);
+  if (lgRefraction) Object.assign(lgRefraction.style, originPos);
+  if (lgLensLayer)  Object.assign(lgLensLayer.style,  originPos);
 
   // Reduced motion
   if (prefersReduced) {
@@ -192,55 +181,60 @@ export function lgMoveTo(activeBtn) {
   const ovX       = dist > 0 ? (dx / dist) * ovAmt : 0;
   const ovY       = dist > 0 ? (dy / dist) * ovAmt : 0;
 
-  // Ancho/alto intermedios: promedio entre origen y destino.
-  const midW  = (fromW + destRect.width)  / 2;
-  const midH  = (fromH + destRect.height) / 2;
-  const midSX = destRect.width  > 0 ? midW / destRect.width  : 1;
-  const midSY = destRect.height > 0 ? midH / destRect.height : 1;
-
   const DUR = 700;
 
-  // Física de slime/gelatina — 5 fases:
-  //   t=0.00 → escala 1 (estado actual)
-  //   t=0.12 → se AGRANDA antes de salir (toma impulso, como slime que se tensa)
-  //   t=0.46 → tamaño intermedio en la mitad del viaje (se afina al viajar)
-  //   t=0.72 → IMPACTO al llegar: se agranda bruscamente (slime que cae)
-  //   t=0.88 → rebote inverso: se achica ligeramente (la onda vuelve)
-  //   t=1.00 → asentamiento en tamaño correcto
+  // Física de slime/gelatina con tamaño animado — 5 fases:
+  //   t=0.00 → fromW/fromH, comprimida antes de salir
+  //   t=0.12 → impulso de salida (se tensa en dirección del viaje)
+  //   t=0.46 → mitad del viaje, tamaño aún en fromW/fromH
+  //   t=0.72 → IMPACTO: llega y cambia al tamaño destino con overshoot
+  //   t=0.88 → rebote: la onda vuelve
+  //   t=1.00 → asentamiento en destW/destH
+  //
+  // width/height se animan junto con transform:
+  //   - Durante el viaje (0→0.72) la gota mantiene el tamaño de origen.
+  //   - Al llegar (0.72) expande al tamaño destino con overshoot de escala.
+  //   - Esto evita el salto visual de ancho al arrancar desde un botón angosto.
   const anim = lgIndicator.animate([
     {
-      // Estado inicial comprimido — tapa el cambio de tamaño al fijarse en destW
+      // Compresión inicial — la gota se achica antes de salir
+      width: fromW + 'px', height: fromH + 'px',
       transform: 'translate(0px, 0px) scale(0.88)',
       offset: 0,
       easing: 'cubic-bezier(0.4, 0, 0.6, 1)',
     },
     {
-      // Impulso de salida: se agranda (como slime que se tensa antes de soltarse)
+      // Impulso: se alarga en la dirección del viaje (inercia de masa)
+      width: fromW + 'px', height: fromH + 'px',
       transform: 'translate(0px, 0px) scaleX(1.18) scaleY(0.88)',
       offset: 0.12,
       easing: 'cubic-bezier(0.4, 0, 0.0, 1)',
     },
     {
-      // Mitad del viaje: tamaño intermedio real entre fromW y destW
-      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,
+      // Mitad del viaje: tamaño origen, posición a la mitad
+      width: fromW + 'px', height: fromH + 'px',
+      transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px)`,
       offset: 0.46,
       easing: 'cubic-bezier(0.0, 0, 0.08, 1)',
     },
     {
-      // Impacto: llega y se aplasta/expande como slime que cae sobre superficie
-      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px) scaleX(1.14) scaleY(0.88)`,
+      // Impacto: llega al destino y AHORA expande al tamaño destino con overshoot
+      width: (destRect.width  * 1.10) + 'px', height: (destRect.height * 0.90) + 'px',
+      transform: `translate(${(dx + ovX).toFixed(2)}px, ${(dy + ovY).toFixed(2)}px)`,
       offset: 0.72,
       easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // Rebote: la onda vuelve, se achica ligeramente en X y crece en Y
-      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scaleX(0.94) scaleY(1.06)`,
+      // Rebote: la onda vuelve
+      width: (destRect.width  * 0.96) + 'px', height: (destRect.height * 1.04) + 'px',
+      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`,
       offset: 0.88,
       easing: 'cubic-bezier(0.25, 0.8, 0.25, 1)',
     },
     {
-      // Asentamiento final
-      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,
+      // Asentamiento final en tamaño destino exacto
+      width: destRect.width + 'px', height: destRect.height + 'px',
+      transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`,
       offset: 1.00,
     },
   ], { duration: DUR, fill: 'none' });
@@ -254,11 +248,13 @@ export function lgMoveTo(activeBtn) {
 
   // lgRefraction y lgLensLayer: misma trayectoria, sin rebote de escala
   if (lgRefraction) {
+    // refrKeyframes: misma trayectoria de posición y tamaño que el indicator,
+    // pero sin el rebote de escala — lgRefraction y lgLensLayer se mueven suaves.
     const refrKeyframes = [
-      { transform: 'translate(0px, 0px) scale(0.88)',                                                                                                            offset: 0,    easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
-      { transform: 'translate(0px, 0px) scaleX(1.18) scaleY(0.88)',                                                                                           offset: 0.12, easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
-      { transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px) scaleX(${midSX.toFixed(4)}) scaleY(${midSY.toFixed(4)})`,               offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)' },
-      { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(1)`,                                                                               offset: 1.00 },
+      { width: fromW + 'px', height: fromH + 'px', transform: 'translate(0px, 0px) scale(0.88)',                                                             offset: 0,    easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
+      { width: fromW + 'px', height: fromH + 'px', transform: 'translate(0px, 0px) scaleX(1.18) scaleY(0.88)',                                               offset: 0.12, easing: 'cubic-bezier(0.4, 0, 0.0, 1)'  },
+      { width: fromW + 'px', height: fromH + 'px', transform: `translate(${(dx * 0.5).toFixed(2)}px, ${(dy * 0.5).toFixed(2)}px)`,                          offset: 0.46, easing: 'cubic-bezier(0.0, 0, 0.08, 1)' },
+      { width: destRect.width + 'px', height: destRect.height + 'px', transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px)`,                       offset: 1.00 },
     ];
     const refrAnim = lgRefraction.animate(refrKeyframes, { duration: DUR, fill: 'none' });
 
@@ -296,19 +292,15 @@ export function lgMoveTo(activeBtn) {
   anim.onfinish = () => {
     if (lgState.currentAnim === anim) lgState.currentAnim = null;
     applyColor(destBg, destBorder);
-    lgIndicator.style.left      = destRect.left + 'px';
-    lgIndicator.style.top       = destRect.top  + 'px';
+    // applyRect fija left, top, width, height en los 3 elementos
+    applyRect(destRect);
     lgIndicator.style.transform = 'none';
     lgIndicator.style.zIndex    = '11';
     if (lgRefraction) {
-      lgRefraction.style.left      = destRect.left + 'px';
-      lgRefraction.style.top       = destRect.top  + 'px';
       lgRefraction.style.transform = 'none';
       lgRefraction.style.zIndex    = '10';
     }
     if (lgLensLayer) {
-      lgLensLayer.style.left      = destRect.left + 'px';
-      lgLensLayer.style.top       = destRect.top  + 'px';
       lgLensLayer.style.transform = 'none';
       lgLensLayer.style.zIndex    = '12';
     }
