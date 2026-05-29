@@ -288,7 +288,11 @@ export function setupSwipe(listEl, viewCat) {
           card.style.transform = `translateX(-${window.innerWidth}px)`;
           card.style.transition = 'transform .28s cubic-bezier(.4,0,.2,1), opacity .28s';
           card.style.opacity = '0';
-          setTimeout(() => { card.style.transform = ''; card.style.transition = ''; card.style.opacity = ''; doDelete(id, true); }, 260);
+          if (viewCat === 'today') {
+            setTimeout(() => { card.style.transform = ''; card.style.transition = ''; card.style.opacity = ''; removeToday(id); }, 260);
+          } else {
+            setTimeout(() => { card.style.transform = ''; card.style.transition = ''; card.style.opacity = ''; doDelete(id, true); }, 260);
+          }
         }
       } else {
         card.style.transition = 'transform .32s cubic-bezier(.34,1.56,.64,1)';
