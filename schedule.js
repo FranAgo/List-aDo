@@ -6,15 +6,22 @@
 // closeCalendar, renderCalendar, toggleCalendar, isCalOpen) — ese widget es
 // del campo de vencimiento, esto es otra cosa.
 //
-// No importa tasks.js a propósito: los bloques y chips usan data-action="edit"
-// / data-id, que ya captura el event delegation global de app.js. Evita una
-// dependencia extra y mantiene el mismo patrón que ya usa el resto del proyecto
-// para no crear ciclos de import entre módulos.
+// Importa openTaskModal de tasks.js para poder crear una tarea directamente
+// desde el calendario (botón "+ Nueva" o click en un horario vacío), con la
+// fecha/hora pre-cargada. No es circular: tasks.js no importa schedule.js,
+// así que esto no choca con el patrón de "evitar ciclos" que usa el resto
+// del proyecto (ese patrón aplica cuando AMBOS lados se necesitan mutuamente,
+// no es una regla de "nunca importar tasks.js").
+//
+// Para EDITAR una tarea existente (click en un chip/bloque ya agendado) se
+// sigue usando data-action="edit", que ya captura el delegation global de
+// app.js — ahí no hace falta ningún import nuevo.
 
 import { state }                                          from './state.js';
 import { api }                                            from './api.js';
 import { esc, showToast }                                 from './ui.js';
 import { getCatColor }                                    from './storage.js';
+import { openTaskModal }                                  from './tasks.js';
 import { isoToDisplay, addMinutesToTime, addDaysISO,
          startOfWeekISO, todayISO }                       from './dates.js';
 
@@ -26,6 +33,10 @@ const MONTH_LBL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Ago
 // ─── HELPERS DE DATOS ──────────────────────────────────────────────────────────
 function scheduledTasks() {
   return state.tasks.filter(t => t.schedDate && t.schedStart);
+}
+
+function hasAnyScheduled() {
+  return scheduledTasks().length > 0;
 }
 
 function hhmmToMin(hhmm) {
@@ -88,21 +99,40 @@ export function renderScheduleView() {
   if (!vc) return;
   const view = state.scheduleView || 'month';
 
+  const emptyBanner = !hasAnyScheduled() ? `
+    <div class="empty sched-empty">
+      <div class="empty-icon">
+        <svg viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <rect x="8" y="12" width="36" height="32" rx="5" stroke="currentColor" stroke-width="1.8"/>
+          <line x1="8" y1="21" x2="44" y2="21" stroke="currentColor" stroke-width="1.8"/>
+          <line x1="17" y1="6" x2="17" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <line x1="35" y1="6" x2="35" y2="15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          <path d="M19 31l4 4 9-9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <p>Todavía no agendaste ninguna tarea acá.</p>
+      <span class="empty-hint">Tocá "+ Nueva", o directamente un día u horario libre en la grilla.</span>
+    </div>` : '';
+
   vc.innerHTML = `
     <div class="view-header">
       <div class="view-title">Calendario</div>
       <div class="view-actions sched-toolbar">
-        <button class="sched-nav-btn" data-sched-nav="-1" title="Anterior">‹</button>
-        <button class="sched-today-btn" data-sched-today title="Ir a hoy">Hoy</button>
-        <button class="sched-nav-btn" data-sched-nav="1" title="Siguiente">›</button>
+        <div class="sched-nav-group">
+          <button class="sched-nav-btn" data-sched-nav="-1" title="Anterior">‹</button>
+          <button class="sched-today-btn" data-sched-today title="Ir a hoy">Hoy</button>
+          <button class="sched-nav-btn" data-sched-nav="1" title="Siguiente">›</button>
+        </div>
         <div class="sched-view-switch">
           <button class="sched-switch-btn ${view === 'month' ? 'active' : ''}" data-sched-view="month">Mes</button>
           <button class="sched-switch-btn ${view === 'week'  ? 'active' : ''}" data-sched-view="week">Semana</button>
           <button class="sched-switch-btn ${view === 'day'   ? 'active' : ''}" data-sched-view="day">Día</button>
         </div>
+        <button class="new-task-btn" data-sched-new title="Nueva tarea agendada">+ Nueva</button>
       </div>
     </div>
-    <div class="sched-label" id="sched-label"></div>
+    <div class="sched-label ${view === 'month' ? 'sched-label-headline' : ''}" id="sched-label"></div>
+    ${emptyBanner}
     <div id="sched-body"></div>`;
 
   wireToolbar(vc);
@@ -120,6 +150,10 @@ function wireToolbar(vc) {
   if (todayBtn) todayBtn.addEventListener('click', scheduleGoToday);
   vc.querySelectorAll('[data-sched-view]').forEach(btn => {
     btn.addEventListener('click', () => switchScheduleView(btn.dataset.schedView));
+  });
+  const newBtn = vc.querySelector('[data-sched-new]');
+  if (newBtn) newBtn.addEventListener('click', () => {
+    openTaskModal(null, { date: state.scheduleRefDate, start: '' });
   });
 }
 
@@ -147,11 +181,11 @@ function renderMonth() {
     const visible   = dayTasks.slice(0, MAX_VISIBLE);
     const extra     = dayTasks.length - visible.length;
     cells += `
-      <div class="sched-month-cell ${isToday ? 'today' : ''}">
-        <div class="sched-month-daynum">${d}</div>
+      <div class="sched-month-cell ${isToday ? 'today' : ''}" data-sched-day="${iso}">
+        <div class="sched-month-daynum ${isToday ? 'sched-daynum-today' : ''}">${d}</div>
         <div class="sched-month-chips">
           ${visible.map(t => chipHTML(t, overlapSet.has(t.id))).join('')}
-          ${extra > 0 ? `<div class="sched-more">+${extra} más</div>` : ''}
+          ${extra > 0 ? `<div class="sched-more" data-sched-day="${iso}">+${extra} más</div>` : ''}
         </div>
       </div>`;
   }
@@ -161,12 +195,29 @@ function renderMonth() {
       ${DOW_LBL.map(d => `<div class="sched-dow">${d}</div>`).join('')}
       ${cells}
     </div>`;
+
+  wireMonthCells();
+}
+
+function wireMonthCells() {
+  document.querySelectorAll('.sched-month-cell[data-sched-day]').forEach(cell => {
+    cell.addEventListener('click', e => {
+      const moreEl = e.target.closest('.sched-more');
+      if (moreEl) {
+        state.scheduleRefDate = moreEl.dataset.schedDay;
+        switchScheduleView('day');
+        return;
+      }
+      if (e.target.closest('.sched-chip')) return;
+      openTaskModal(null, { date: cell.dataset.schedDay, start: '' });
+    });
+  });
 }
 
 function chipHTML(t, overlapping) {
   const col = getCatColor(t.category || '');
   return `<div class="sched-chip ${overlapping ? 'overlap' : ''} ${t.done ? 'done' : ''}" data-action="edit" data-id="${t.id}"
-            style="background:${col.bg};border-color:${col.border};color:${col.text}">
+            style="background:${col.bg};border-color:${col.border};color:${col.text};--card-glow:${col.border}">
             <span class="sched-chip-time">${esc(t.schedStart)}</span> ${esc(t.title)}
           </div>`;
 }
@@ -214,6 +265,7 @@ function renderWeek() {
     </div>`;
 
   wireBlocks();
+  document.querySelectorAll('.sched-week-track[data-sched-track]').forEach(wireEmptyTrackClick);
   autoscrollToHour(7);
 }
 
@@ -237,6 +289,7 @@ function renderDay() {
     </div>`;
 
   wireBlocks();
+  document.querySelectorAll('.sched-day-track[data-sched-track]').forEach(wireEmptyTrackClick);
   autoscrollToHour(7);
 }
 
@@ -254,10 +307,26 @@ function blockHTML(t, overlapping) {
   return `
     <div class="sched-block ${overlapping ? 'overlap' : ''} ${t.done ? 'done' : ''}" data-action="edit" data-id="${t.id}"
          data-sched-block-id="${t.id}"
-         style="top:${top}px;height:${hgt}px;background:${col.bg};border-color:${col.border};color:${col.text}">
+         style="top:${top}px;height:${hgt}px;background:${col.bg};border-color:${col.border};color:${col.text};--card-glow:${col.border}">
       <div class="sched-block-time">${esc(t.schedStart)}–${esc(endHHMM)}</div>
       <div class="sched-block-title">${esc(t.title)}</div>
     </div>`;
+}
+
+function wireEmptyTrackClick(trackEl) {
+  trackEl.addEventListener('click', e => {
+    // Si el click cayó en un bloque (hijo del track), eso ya lo maneja
+    // su propio listener / el delegation global de "edit" — no crear nada.
+    if (e.target !== trackEl) return;
+    const rect    = trackEl.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    let minutes   = Math.round((offsetY / ROW_H) * 60);
+    minutes       = Math.max(0, Math.min(minutes, 23 * 60 + 59));
+    minutes       = Math.round(minutes / SNAP_MIN) * SNAP_MIN;
+    const h = Math.floor(minutes / 60), m = minutes % 60;
+    const start = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    openTaskModal(null, { date: trackEl.dataset.schedTrack, start });
+  });
 }
 
 function autoscrollToHour(h) {

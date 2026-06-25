@@ -1811,6 +1811,8 @@ body {
 /* ═══════════════════════════════════════════════════════════════════════════
    SECCIÓN CALENDARIO — todo con prefijo .sched-* para no chocar con el
    mini date-picker del campo de vencimiento (.cal-*, #cal-toggle-btn, etc).
+   Reutiliza el lenguaje visual ya establecido (gradientes de surface, glow
+   de acento, .empty/.empty-icon/.empty-hint) en vez de inventar uno nuevo.
    ROW_H = 48px por hora — si se cambia acá, cambiar también la constante
    ROW_H en schedule.js (acoplamiento intencional, documentado en ambos lados).
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -1836,52 +1838,68 @@ body {
    Chrome/Edge sea oscuro, igual que ya existe para input[type="date"]. */
 .field input[type="time"] { color-scheme: dark; }
 
-/* ─── Toolbar ────────────────────────────────────────────────────────────── */
-.sched-toolbar { flex-wrap: wrap; }
-
-.sched-nav-btn,
-.sched-today-btn {
-  background: var(--surface2);
-  border: 1px solid var(--border2);
-  border-radius: var(--radius-sm);
-  color: var(--text2);
-  font-family: 'DM Sans', sans-serif;
-  font-size: 0.8125rem;
-  padding: 6px 12px;
-  cursor: pointer;
-  transition: all .12s;
+/* ─── Toolbar — segmented pills, mismo lenguaje que .stats-pill ─────────── */
+.sched-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
 }
 
-.sched-nav-btn { padding: 6px 10px; font-size: 0.9rem; line-height: 1; }
+.sched-toolbar .new-task-btn { margin-left: auto; }
 
-.sched-nav-btn:hover,
-.sched-today-btn:hover { border-color: var(--border3); color: var(--text); background: var(--surface3); }
-
+.sched-nav-group,
 .sched-view-switch {
   display: flex;
+  align-items: center;
   gap: 2px;
   background: var(--surface2);
   border: 1px solid var(--border2);
-  border-radius: var(--radius-sm);
-  padding: 2px;
-  margin-left: auto;
+  border-radius: 999px;
+  padding: 3px;
 }
 
+.sched-nav-btn,
+.sched-today-btn,
 .sched-switch-btn {
   background: transparent;
   border: none;
-  border-radius: 6px;
+  border-radius: 999px;
   color: var(--text3);
   font-family: 'DM Sans', sans-serif;
-  font-size: 0.75rem;
-  padding: 5px 11px;
   cursor: pointer;
-  transition: all .12s;
+  transition: all .14s;
 }
 
-.sched-switch-btn:hover    { color: var(--text2); }
-.sched-switch-btn.active   { background: var(--accent-dim); color: var(--accent); }
+.sched-nav-btn {
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.9375rem;
+  line-height: 1;
+}
 
+.sched-today-btn { padding: 0 13px; height: 26px; font-size: 0.75rem; }
+.sched-switch-btn { padding: 5px 12px; font-size: 0.75rem; }
+
+.sched-nav-btn:hover,
+.sched-today-btn:hover { color: var(--text2); background: var(--surface3); }
+
+.sched-switch-btn:hover { color: var(--text2); }
+
+.sched-switch-btn.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 500;
+  box-shadow: 0 2px 8px rgba(200, 240, 96, .28);
+}
+
+/* Etiqueta de período — registro distinto según vista: el mes es la vista
+   por defecto y se trata como un titular (serif); semana/día son lecturas
+   utilitarias más chicas (mono), a propósito — no todas las vistas merecen
+   el mismo peso visual. */
 .sched-label {
   font-family: 'DM Mono', monospace;
   font-size: 0.75rem;
@@ -1890,15 +1908,29 @@ body {
   letter-spacing: .02em;
 }
 
+.sched-label.sched-label-headline {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 1.55rem;
+  color: var(--text);
+  letter-spacing: -.3px;
+  margin-bottom: 1.1rem;
+}
+
+/* Banner vacío — reusa .empty/.empty-icon/.empty-hint del resto de la app,
+   solo con menos padding porque convive arriba de la grilla, no la reemplaza. */
+.empty.sched-empty { padding: 1.6rem 1rem; margin-bottom: .25rem; }
+
 /* ─── Vista mes ──────────────────────────────────────────────────────────── */
 .sched-grid-month {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
   gap: 1px;
   background: var(--border);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .sched-dow {
@@ -1912,16 +1944,26 @@ body {
 }
 
 .sched-month-cell {
-  background: var(--surface);
-  min-height: 84px;
-  padding: 6px;
+  background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%);
+  min-height: 88px;
+  padding: 7px;
   display: flex;
   flex-direction: column;
-  gap: 3px;
+  gap: 4px;
+  cursor: pointer;
+  transition: background .15s;
 }
 
-.sched-month-cell.empty { background: var(--bg); }
-.sched-month-cell.today { background: var(--accent-dim); }
+.sched-month-cell:hover { background: linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%); }
+.sched-month-cell.empty { background: var(--bg); cursor: default; }
+.sched-month-cell.empty:hover { background: var(--bg); }
+
+.sched-month-cell.today {
+  background: linear-gradient(160deg, rgba(200, 240, 96, .14) 0%, var(--surface2) 100%);
+  box-shadow: inset 0 0 0 1px rgba(200, 240, 96, .3);
+}
+
+.sched-month-cell.today:hover { background: linear-gradient(160deg, rgba(200, 240, 96, .2) 0%, var(--surface2) 100%); }
 
 .sched-month-daynum {
   font-size: 0.6875rem;
@@ -1929,7 +1971,14 @@ body {
   font-family: 'DM Mono', monospace;
 }
 
-.sched-month-cell.today .sched-month-daynum { color: var(--accent); font-weight: 500; }
+/* El numeral de hoy es el único punto de la grilla mes que rompe a serif —
+   un toque deliberado, no decoración repetida en todos los días. */
+.sched-daynum-today {
+  font-family: 'Instrument Serif', serif;
+  font-style: italic;
+  font-size: 1.0625rem;
+  color: var(--accent);
+}
 
 .sched-month-chips {
   display: flex;
@@ -1947,36 +1996,38 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  transition: opacity .12s;
+  transition: box-shadow .15s, opacity .12s;
 }
 
-.sched-chip:hover { opacity: .82; }
-
-.sched-chip.overlap { outline: 2px solid var(--yellow); outline-offset: -2px; }
+.sched-chip:hover    { box-shadow: 0 0 10px -2px var(--card-glow, transparent); }
+.sched-chip.overlap  { outline: 2px solid var(--yellow); outline-offset: -2px; }
 
 .sched-chip.done {
   opacity: .45;
   text-decoration: line-through;
   cursor: default;
 }
+.sched-chip.done:hover { box-shadow: none; }
 
-.sched-chip-time {
-  font-family: 'DM Mono', monospace;
-  opacity: .8;
-}
+.sched-chip-time { font-family: 'DM Mono', monospace; opacity: .8; }
 
 .sched-more {
   font-size: 0.625rem;
   color: var(--text3);
   padding: 1px 5px;
+  cursor: pointer;
+  transition: color .12s;
 }
+
+.sched-more:hover { color: var(--accent); }
 
 /* ─── Vistas semana / día — compartidas ─────────────────────────────────── */
 .sched-grid-week,
 .sched-grid-day {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
   overflow: hidden;
+  box-shadow: var(--shadow-sm);
 }
 
 .sched-week-headerrow {
@@ -2000,11 +2051,24 @@ body {
 .sched-week-headcell span {
   font-family: 'DM Mono', monospace;
   color: var(--text2);
-  margin-left: 3px;
+  margin-left: 4px;
 }
 
-.sched-week-headcell.today        { color: var(--accent); }
-.sched-week-headcell.today span   { color: var(--accent); font-weight: 500; }
+/* "Hoy" en el header de semana se ve como un círculo lleno, mismo patrón
+   reconocible de cualquier calendario — pero solo en este único lugar. */
+.sched-week-headcell.today { color: var(--accent); }
+.sched-week-headcell.today span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 600;
+  font-size: 0.6875rem;
+}
 
 .sched-scroll {
   display: flex;
@@ -2031,27 +2095,25 @@ body {
   border-top: 1px solid var(--border);
 }
 
-.sched-week-cols {
-  display: flex;
-  flex: 1;
-}
+.sched-week-cols { display: flex; flex: 1; }
 
 .sched-week-track,
 .sched-day-track {
   position: relative;
   flex: 1;
   min-width: 0;
-  background: var(--surface);
+  background-color: var(--surface);
   background-image: repeating-linear-gradient(
     to bottom,
     var(--border) 0, var(--border) 1px,
     transparent 1px, transparent 48px
   );
   border-right: 1px solid var(--border);
+  cursor: pointer;
 }
 
 .sched-week-track.today,
-.sched-day-track.today { background-color: var(--accent-dim); }
+.sched-day-track.today { background-color: rgba(200, 240, 96, .05); }
 
 .sched-day-track { border-right: none; }
 
@@ -2066,11 +2128,15 @@ body {
   overflow: hidden;
   cursor: grab;
   touch-action: none; /* el drag propio maneja el gesto, sin scroll nativo de por medio */
-  transition: box-shadow .12s;
+  transition: transform .15s cubic-bezier(.25, .8, .25, 1), box-shadow .15s;
   user-select: none;
 }
 
-.sched-block:hover    { box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.sched-block:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(255,255,255,.06), 0 4px 14px -4px var(--card-glow, transparent), var(--shadow-sm);
+}
+
 .sched-block.sched-dragging {
   cursor: grabbing;
   box-shadow: var(--shadow-md);
@@ -2083,7 +2149,7 @@ body {
   opacity: .45;
   cursor: default;
 }
-
+.sched-block.done:hover { transform: none; box-shadow: none; }
 .sched-block.done .sched-block-title { text-decoration: line-through; }
 
 .sched-block-time {
@@ -2103,14 +2169,13 @@ body {
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 520px) {
-  .sched-toolbar      { width: 100%; justify-content: space-between; }
-  .sched-view-switch  { margin-left: 0; }
-  .sched-month-cell   { min-height: 56px; padding: 4px; }
-  .sched-chip         { font-size: 0.5625rem; }
+  .sched-toolbar          { width: 100%; }
+  .sched-toolbar .new-task-btn { margin-left: 0; width: 100%; text-align: center; order: 3; }
+  .sched-month-cell       { min-height: 56px; padding: 4px; }
+  .sched-chip             { font-size: 0.5625rem; }
   .sched-hourcol,
-  .sched-hourcol-spacer { width: 38px; }
-  .sched-hour-lbl     { font-size: 0.5625rem; padding-right: 5px; }
-  .sched-modal-row    { flex-wrap: wrap; }
+  .sched-hourcol-spacer   { width: 38px; }
+  .sched-hour-lbl         { font-size: 0.5625rem; padding-right: 5px; }
+  .sched-modal-row        { flex-wrap: wrap; }
   .sched-modal-row .sched-date-inp { flex: 1 1 100%; }
 }
-

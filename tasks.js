@@ -305,7 +305,7 @@ export function setupSwipe(listEl, viewCat) {
 }
 
 // ─── TASK CRUD ─────────────────────────────────────────────────────────────────
-export function openTaskModal(task) {
+export function openTaskModal(task, preset) {
   state.editingId = task ? task.id : null;
   document.getElementById('task-modal-title').textContent = task ? 'Editar tarea' : 'Nueva tarea';
   document.getElementById('f-title').value = task ? task.title : '';
@@ -318,15 +318,28 @@ export function openTaskModal(task) {
   const schedDateInp  = document.getElementById('f-sched-date');
   const schedStartInp = document.getElementById('f-sched-start');
   const schedEndInp   = document.getElementById('f-sched-end');
-  if (schedDateInp)  schedDateInp.value  = task ? (task.schedDate || '') : '';
-  if (schedStartInp) schedStartInp.value = task ? (task.schedStart || '') : '';
+  if (schedDateInp)  schedDateInp.value  = task ? (task.schedDate  || '') : (preset?.date  || '');
+  if (schedStartInp) schedStartInp.value = task ? (task.schedStart || '') : (preset?.start || '');
   if (schedEndInp)   schedEndInp.value   = (task && task.schedStart && task.schedDuration)
-    ? addMinutesToTime(task.schedStart, task.schedDuration) : '';
+    ? addMinutesToTime(task.schedStart, task.schedDuration)
+    : (preset?.start ? addMinutesToTime(preset.start, 30) : '');
   const schedHint = document.getElementById('sched-hint');
   if (schedHint) schedHint.textContent = '';
   const sel = document.getElementById('f-category');
-  sel.innerHTML = state.categories.map(c => `<option value="${esc(c)}" ${task && task.category===c ? 'selected' : ''}>${esc(c)}</option>`).join('');
-  if (!task && state.currentCat !== 'today' && state.currentCat !== 'schedule') sel.value = state.currentCat;
+  const optsHTML = state.categories.map(c => `<option value="${esc(c)}" ${task && task.category===c ? 'selected' : ''}>${esc(c)}</option>`).join('');
+  if (task) {
+    // Editando: la lista actual de la tarea queda marcada como selected arriba.
+    sel.innerHTML = optsHTML;
+  } else if (state.currentCat !== 'today' && state.currentCat !== 'schedule') {
+    // Parado en una lista real al crear: esa es la categoría obvia, se preselecciona.
+    sel.innerHTML = optsHTML;
+    sel.value = state.currentCat;
+  } else {
+    // "Tareas de hoy" o "Calendario" no son listas reales — no existe una
+    // categoría obvia para asumir. Nunca se preselecciona ninguna a ciegas:
+    // toda tarea tiene que pertenecer a un grupo, elegido a propósito.
+    sel.innerHTML = `<option value="" disabled selected>Elegí una lista…</option>${optsHTML}`;
+  }
   document.getElementById('task-modal-bg').classList.add('open');
   setTimeout(() => document.getElementById('f-title').focus(), 220);
 }
