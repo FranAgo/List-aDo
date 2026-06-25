@@ -43,4 +43,8 @@ export const state = {
 
   // Switch cat timer
   _switchCatTimer: null,
+
+  // Sección Calendario — vista (mes/semana/día) y fecha de referencia visible
+  scheduleView:    'month',
+  scheduleRefDate: null,
 };

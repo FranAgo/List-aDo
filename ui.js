@@ -63,6 +63,7 @@ export function renderCatBar() {
 
   const todayCount = state.tasks.filter(t => state.todayIds.has(t.id) && !t.done).length;
   let h = `<button class="cat-btn ${state.currentCat==='today'?'active':''}" data-cat-action="today">Tareas de hoy <span class="cat-count">${todayCount}</span></button>`;
+  h += `<button class="cat-btn ${state.currentCat==='schedule'?'active':''}" data-cat-action="schedule">Calendario</button>`;
 
   state.listOrder.forEach((c, i) => {
     const n      = state.tasks.filter(t => t.category===c && !t.done && !state.todayIds.has(t.id)).length;
@@ -170,6 +171,13 @@ export function switchCat(c) {
 // ─── VIEW ──────────────────────────────────────────────────────────────────────
 export function renderView() {
   const vc = document.getElementById('view-container');
+  // La sección Calendario vive en schedule.js. ui.js no la importa directo
+  // para no crear un ciclo (mismo motivo por el que tasks.js no se importa
+  // acá) — se llama vía callback registrado en window por app.js.
+  if (state.currentCat === 'schedule') {
+    if (typeof window._renderScheduleView === 'function') window._renderScheduleView();
+    return;
+  }
   let list;
   if (state.currentCat === 'today') {
     list = state.tasks

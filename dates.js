@@ -92,3 +92,65 @@ export function fmtCreatedAt(ts) {
   const year  = d.getFullYear();
   return `${day}/${month}/${year}`;
 }
+
+// ─── HELPERS DE HORA Y FECHA — sección Calendario ───────────────────────────
+// Agregados para schedule.js. No modifican ninguna función existente arriba.
+
+/** "HH:MM" → minutos desde las 00:00, o null si el formato es inválido. */
+function parseHHMM(hhmm) {
+  if (!hhmm) return null;
+  const m = String(hhmm).match(/^(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  const h = parseInt(m[1], 10), mi = parseInt(m[2], 10);
+  if (h < 0 || h > 23 || mi < 0 || mi > 59) return null;
+  return h * 60 + mi;
+}
+
+/** Minutos entre dos horarios "HH:MM" del mismo día. NaN si alguno es inválido. */
+export function minutesBetween(startHHMM, endHHMM) {
+  const s = parseHHMM(startHHMM), e = parseHHMM(endHHMM);
+  if (s === null || e === null) return NaN;
+  return e - s;
+}
+
+/** Suma minutos a un horario "HH:MM". Clampea a 23:59, no pasa al día siguiente. */
+export function addMinutesToTime(hhmm, minutes) {
+  const s = parseHHMM(hhmm);
+  if (s === null) return '';
+  const total = Math.min(s + Number(minutes || 0), 23 * 60 + 59);
+  const h = Math.floor(total / 60), m = total % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
+/** Date local → YYYY-MM-DD. Evita pasar por UTC (mismo motivo que parseLocalDate). */
+export function toISOLocal(d) {
+  const y  = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${y}-${mo}-${da}`;
+}
+
+/** YYYY-MM-DD de hoy, en hora local. */
+export function todayISO() {
+  return toISOLocal(new Date());
+}
+
+/** YYYY-MM-DD + n días (n puede ser negativo) → YYYY-MM-DD */
+export function addDaysISO(iso, n) {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  d.setDate(d.getDate() + n);
+  return toISOLocal(d);
+}
+
+/** Lunes de la semana que contiene esa fecha ISO (semana arranca lunes, igual que el mini-calendario de ui.js). */
+export function startOfWeekISO(iso) {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return iso;
+  const d = new Date(parseInt(m[1], 10), parseInt(m[2], 10) - 1, parseInt(m[3], 10));
+  const dow  = d.getDay(); // 0 = domingo
+  const diff = dow === 0 ? -6 : 1 - dow;
+  d.setDate(d.getDate() + diff);
+  return toISOLocal(d);
+}

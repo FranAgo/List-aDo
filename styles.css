@@ -1808,3 +1808,309 @@ body {
   .task-actions { opacity: 1; }
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   SECCIÓN CALENDARIO — todo con prefijo .sched-* para no chocar con el
+   mini date-picker del campo de vencimiento (.cal-*, #cal-toggle-btn, etc).
+   ROW_H = 48px por hora — si se cambia acá, cambiar también la constante
+   ROW_H en schedule.js (acoplamiento intencional, documentado en ambos lados).
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Campos de agenda en el modal de tarea ─────────────────────────────── */
+.sched-modal-row {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.sched-modal-row .sched-date-inp { flex: 1.3; }
+.sched-modal-row .sched-time-inp { flex: 1; }
+
+.sched-time-sep {
+  color: var(--text3);
+  font-size: 0.75rem;
+  flex-shrink: 0;
+}
+
+/* Inputs date/time nativos heredan el estilo de ".field input" del resto del
+   archivo. Solo el color-scheme hace falta para que el picker nativo de
+   Chrome/Edge sea oscuro, igual que ya existe para input[type="date"]. */
+.field input[type="time"] { color-scheme: dark; }
+
+/* ─── Toolbar ────────────────────────────────────────────────────────────── */
+.sched-toolbar { flex-wrap: wrap; }
+
+.sched-nav-btn,
+.sched-today-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  color: var(--text2);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.8125rem;
+  padding: 6px 12px;
+  cursor: pointer;
+  transition: all .12s;
+}
+
+.sched-nav-btn { padding: 6px 10px; font-size: 0.9rem; line-height: 1; }
+
+.sched-nav-btn:hover,
+.sched-today-btn:hover { border-color: var(--border3); color: var(--text); background: var(--surface3); }
+
+.sched-view-switch {
+  display: flex;
+  gap: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  margin-left: auto;
+}
+
+.sched-switch-btn {
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: var(--text3);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.75rem;
+  padding: 5px 11px;
+  cursor: pointer;
+  transition: all .12s;
+}
+
+.sched-switch-btn:hover    { color: var(--text2); }
+.sched-switch-btn.active   { background: var(--accent-dim); color: var(--accent); }
+
+.sched-label {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text3);
+  margin-bottom: .85rem;
+  letter-spacing: .02em;
+}
+
+/* ─── Vista mes ──────────────────────────────────────────────────────────── */
+.sched-grid-month {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.sched-dow {
+  background: var(--surface2);
+  color: var(--text3);
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.sched-month-cell {
+  background: var(--surface);
+  min-height: 84px;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.sched-month-cell.empty { background: var(--bg); }
+.sched-month-cell.today { background: var(--accent-dim); }
+
+.sched-month-daynum {
+  font-size: 0.6875rem;
+  color: var(--text3);
+  font-family: 'DM Mono', monospace;
+}
+
+.sched-month-cell.today .sched-month-daynum { color: var(--accent); font-weight: 500; }
+
+.sched-month-chips {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.sched-chip {
+  font-size: 0.625rem;
+  padding: 2px 5px;
+  border-radius: 5px;
+  border: 1px solid;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  transition: opacity .12s;
+}
+
+.sched-chip:hover { opacity: .82; }
+
+.sched-chip.overlap { outline: 2px solid var(--yellow); outline-offset: -2px; }
+
+.sched-chip.done {
+  opacity: .45;
+  text-decoration: line-through;
+  cursor: default;
+}
+
+.sched-chip-time {
+  font-family: 'DM Mono', monospace;
+  opacity: .8;
+}
+
+.sched-more {
+  font-size: 0.625rem;
+  color: var(--text3);
+  padding: 1px 5px;
+}
+
+/* ─── Vistas semana / día — compartidas ─────────────────────────────────── */
+.sched-grid-week,
+.sched-grid-day {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.sched-week-headerrow {
+  display: flex;
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border2);
+}
+
+.sched-hourcol-spacer { width: 52px; flex-shrink: 0; }
+
+.sched-week-headcell {
+  flex: 1;
+  text-align: center;
+  font-size: 0.6875rem;
+  color: var(--text3);
+  padding: 8px 0;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.sched-week-headcell span {
+  font-family: 'DM Mono', monospace;
+  color: var(--text2);
+  margin-left: 3px;
+}
+
+.sched-week-headcell.today        { color: var(--accent); }
+.sched-week-headcell.today span   { color: var(--accent); font-weight: 500; }
+
+.sched-scroll {
+  display: flex;
+  max-height: 480px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 240, 96, 0.2) transparent;
+}
+
+.sched-hourcol {
+  width: 52px;
+  flex-shrink: 0;
+  background: var(--surface);
+  border-right: 1px solid var(--border);
+}
+
+.sched-hour-lbl {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.625rem;
+  color: var(--text3);
+  text-align: right;
+  padding-right: 8px;
+  box-sizing: border-box;
+  border-top: 1px solid var(--border);
+}
+
+.sched-week-cols {
+  display: flex;
+  flex: 1;
+}
+
+.sched-week-track,
+.sched-day-track {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  background: var(--surface);
+  background-image: repeating-linear-gradient(
+    to bottom,
+    var(--border) 0, var(--border) 1px,
+    transparent 1px, transparent 48px
+  );
+  border-right: 1px solid var(--border);
+}
+
+.sched-week-track.today,
+.sched-day-track.today { background-color: var(--accent-dim); }
+
+.sched-day-track { border-right: none; }
+
+/* ─── Bloques de tarea agendada ──────────────────────────────────────────── */
+.sched-block {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  border-radius: 6px;
+  border: 1px solid;
+  padding: 3px 6px;
+  overflow: hidden;
+  cursor: grab;
+  touch-action: none; /* el drag propio maneja el gesto, sin scroll nativo de por medio */
+  transition: box-shadow .12s;
+  user-select: none;
+}
+
+.sched-block:hover    { box-shadow: 0 2px 8px rgba(0,0,0,.35); }
+.sched-block.sched-dragging {
+  cursor: grabbing;
+  box-shadow: var(--shadow-md);
+  z-index: 5;
+}
+
+.sched-block.overlap { outline: 2px solid var(--yellow); outline-offset: -2px; }
+
+.sched-block.done {
+  opacity: .45;
+  cursor: default;
+}
+
+.sched-block.done .sched-block-title { text-decoration: line-through; }
+
+.sched-block-time {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5625rem;
+  opacity: .85;
+  white-space: nowrap;
+}
+
+.sched-block-title {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ─── Responsive ─────────────────────────────────────────────────────────── */
+@media (max-width: 520px) {
+  .sched-toolbar      { width: 100%; justify-content: space-between; }
+  .sched-view-switch  { margin-left: 0; }
+  .sched-month-cell   { min-height: 56px; padding: 4px; }
+  .sched-chip         { font-size: 0.5625rem; }
+  .sched-hourcol,
+  .sched-hourcol-spacer { width: 38px; }
+  .sched-hour-lbl     { font-size: 0.5625rem; padding-right: 5px; }
+  .sched-modal-row    { flex-wrap: wrap; }
+  .sched-modal-row .sched-date-inp { flex: 1 1 100%; }
+}
+

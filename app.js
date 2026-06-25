@@ -17,6 +17,7 @@ import { onDueInput }                                     from './dates.js';
 import { state }                                          from './state.js';
 import { lgShowPreview, lgHidePreview }                  from './animations.js';
 import { api }                                            from './api.js';
+import { renderScheduleView }                              from './schedule.js';
 
 // ─── REGISTRAR CALLBACKS GLOBALES ──────────────────────────────────────────────
 // ui.js y animations.js necesitan llamar a setupDrag/setupSwipe sin importar tasks.js
@@ -25,6 +26,9 @@ window._setupDrag  = setupDrag;
 window._setupSwipe = setupSwipe;
 window._onDueInput = onDueInput;
 window._uiCalendar = { closeCalendar };
+
+// Misma razón: ui.js no importa schedule.js directo para no crear un ciclo.
+window._renderScheduleView = renderScheduleView;
 
 // commitPendingUndo necesita llamar a api — se registra el callback aquí.
 // (ui.js no importa api.js para no crear una dependencia cruzada innecesaria)
@@ -63,6 +67,7 @@ document.addEventListener('click', e => {
   if (!t) return;
 
   if (t.dataset.catAction === 'today') { switchCat('today'); return; }
+  if (t.dataset.catAction === 'schedule') { switchCat('schedule'); return; }
   if (t.dataset.catAction === 'new')   { openCatModal(); return; }
   if (t.dataset.idx !== undefined && !t.dataset.action) { switchCat(t.dataset.cat); return; }
 

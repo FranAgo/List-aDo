@@ -4,7 +4,8 @@
 import { state }                              from './state.js';
 import { api }                                from './api.js';
 import { parseLocalDate, parseUserDate,
-         isoToDisplay, normalizeToISO }       from './dates.js';
+         isoToDisplay, normalizeToISO,
+         minutesBetween, addMinutesToTime }              from './dates.js';
 import { renderCatBar, renderView, updateStats,
          showToast, showToastUndo, showToastConfirm,
          commitPendingUndo, taskHTML, esc }   from './ui.js';
@@ -314,9 +315,18 @@ export function openTaskModal(task) {
   dueInp.classList.remove('inp-error');
   const hint = document.getElementById('due-hint');
   if (hint) { hint.textContent = ''; hint.className = 'date-hint'; }
+  const schedDateInp  = document.getElementById('f-sched-date');
+  const schedStartInp = document.getElementById('f-sched-start');
+  const schedEndInp   = document.getElementById('f-sched-end');
+  if (schedDateInp)  schedDateInp.value  = task ? (task.schedDate || '') : '';
+  if (schedStartInp) schedStartInp.value = task ? (task.schedStart || '') : '';
+  if (schedEndInp)   schedEndInp.value   = (task && task.schedStart && task.schedDuration)
+    ? addMinutesToTime(task.schedStart, task.schedDuration) : '';
+  const schedHint = document.getElementById('sched-hint');
+  if (schedHint) schedHint.textContent = '';
   const sel = document.getElementById('f-category');
   sel.innerHTML = state.categories.map(c => `<option value="${esc(c)}" ${task && task.category===c ? 'selected' : ''}>${esc(c)}</option>`).join('');
-  if (!task && state.currentCat !== 'today') sel.value = state.currentCat;
+  if (!task && state.currentCat !== 'today' && state.currentCat !== 'schedule') sel.value = state.currentCat;
   document.getElementById('task-modal-bg').classList.add('open');
   setTimeout(() => document.getElementById('f-title').focus(), 220);
 }
@@ -345,6 +355,24 @@ export async function saveTask() {
     }
   }
 
+  const schedDate  = document.getElementById('f-sched-date')?.value.trim()  || '';
+  const schedStart = document.getElementById('f-sched-start')?.value.trim() || '';
+  let   schedEnd   = document.getElementById('f-sched-end')?.value.trim()   || '';
+  let   schedDuration = 0;
+  if (schedDate || schedStart || schedEnd) {
+    if (!schedDate || !schedStart) {
+      showToast('Para agendar la tarea, completá fecha y hora de inicio');
+      return;
+    }
+    if (!schedEnd) schedEnd = addMinutesToTime(schedStart, 30); // default: 30 min
+    const dur = minutesBetween(schedStart, schedEnd);
+    if (!dur || dur <= 0) {
+      showToast('La hora de fin tiene que ser posterior a la de inicio');
+      return;
+    }
+    schedDuration = dur;
+  }
+
   const saveBtn = document.getElementById('task-save-btn');
   if (saveBtn) { saveBtn.disabled = true; saveBtn.textContent = 'Guardando…'; }
 
@@ -352,15 +380,18 @@ export async function saveTask() {
   const existing  = currentEditingId ? state.tasks.find(t => t.id === currentEditingId) : null;
   const maxOrder  = state.tasks.filter(t => t.category === category).reduce((m, t) => Math.max(m, t.order||0), -1);
   const task = {
-    id:        currentEditingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,5)),
+    id:            currentEditingId || (Date.now().toString(36) + Math.random().toString(36).slice(2,5)),
     title,
-    desc:      document.getElementById('f-desc').value.trim(),
-    due:       dueISO,
+    desc:          document.getElementById('f-desc').value.trim(),
+    due:           dueISO,
     category,
-    done:      existing ? existing.done : false,
-    createdAt: existing ? existing.createdAt : Date.now(),
-    order:     existing ? existing.order : maxOrder + 1,
-    today:     existing ? (existing.today || false) : false,
+    done:          existing ? existing.done : false,
+    createdAt:     existing ? existing.createdAt : Date.now(),
+    order:         existing ? existing.order : maxOrder + 1,
+    today:         existing ? (existing.today || false) : false,
+    schedDate:     schedDate     || '',
+    schedStart:    schedStart    || '',
+    schedDuration: schedDuration || 0,
   };
 
   const result = await api({ action: currentEditingId ? 'updateTask' : 'saveTask', task: JSON.stringify(task) });
