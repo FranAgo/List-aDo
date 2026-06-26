@@ -46,7 +46,7 @@ export async function init() {
   }
 
   if (Array.isArray(tks)) {
-    state.tasks = tks.map(t => ({ ...t, due: normalizeToISO(t.due) }));
+    state.tasks = tks.map(t => ({ ...t, due: normalizeToISO(t.due), schedDate: t.schedDate ? normalizeToISO(t.schedDate) : '' }));
     state.tasks.forEach(t => { if (t.today) state.todayIds.add(t.id); });
     // Purgar IDs de tareas eliminadas del todayIds
     const existingIds = new Set(state.tasks.map(t => t.id));
