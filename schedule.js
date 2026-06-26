@@ -139,7 +139,7 @@ export function renderScheduleView() {
         <button class="new-task-btn" data-sched-new title="Nueva tarea agendada">+ Nueva</button>
       </div>
     </div>
-    <div class="sched-label ${view === 'month' ? 'sched-label-headline' : ''}" id="sched-label"></div>
+    <div class="sched-label" id="sched-label"></div>
     ${emptyBanner}
     <div id="sched-body"></div>`;
 

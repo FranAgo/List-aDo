@@ -1944,19 +1944,11 @@ body {
    utilitarias más chicas (mono), a propósito — no todas las vistas merecen
    el mismo peso visual. */
 .sched-label {
-  font-family: 'DM Mono', monospace;
-  font-size: 0.75rem;
-  color: var(--text3);
-  margin-bottom: .85rem;
-  letter-spacing: .02em;
-}
-
-.sched-label.sched-label-headline {
   font-family: 'Instrument Serif', serif;
   font-style: italic;
-  font-size: 1.55rem;
+  font-size: 1.4rem;
   color: var(--text);
-  letter-spacing: -.3px;
+  letter-spacing: -.2px;
   margin-bottom: 1.1rem;
 }
 
@@ -2131,10 +2123,10 @@ body {
 
 .sched-hour-lbl {
   font-family: 'DM Mono', monospace;
-  font-size: 0.625rem;
-  color: var(--text3);
+  font-size: 0.6875rem;
+  color: var(--text2);
   text-align: right;
-  padding-right: 8px;
+  padding: 5px 8px 0 0;
   box-sizing: border-box;
   border-top: 1px solid var(--border);
 }
@@ -2242,6 +2234,7 @@ body {
 
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 520px) {
+  .sched-label            { font-size: 1.15rem; }
   .sched-toolbar          { width: 100%; }
   .sched-toolbar .new-task-btn { margin-left: 0; width: 100%; text-align: center; order: 3; }
   .sched-month-cell       { min-height: 56px; padding: 4px; }
