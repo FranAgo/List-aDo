@@ -67,6 +67,14 @@ function groupByDate(tasks) {
   return map;
 }
 
+/** Sube la opacidad del fondo SOLO para chips/bloques del calendario, sin
+ * tocar CAT_PALETTE — esa paleta la usa también la cat-bar y los chips del
+ * resto de la app, y ahí la sutileza es intencional. Acá, el bloque ES el
+ * contenido principal de la vista, necesita pararse más. */
+function vividBg(col, opacity) {
+  return col.bg.replace(/[\d.]+\)$/, `${opacity})`);
+}
+
 // ─── NAVEGACIÓN / TOOLBAR ──────────────────────────────────────────────────────
 export function switchScheduleView(view) {
   state.scheduleView = view;
@@ -217,7 +225,7 @@ function wireMonthCells() {
 function chipHTML(t, overlapping) {
   const col = getCatColor(t.category || '');
   return `<div class="sched-chip ${overlapping ? 'overlap' : ''} ${t.done ? 'done' : ''}" data-action="edit" data-id="${t.id}"
-            style="background:${col.bg};border-color:${col.border};color:${col.text};--card-glow:${col.border}">
+            style="background:${vividBg(col, 0.24)};border-color:${col.border};border-left-color:${col.text};color:${col.text};--card-glow:${col.text}">
             <span class="sched-chip-time">${esc(t.schedStart)}</span> ${esc(t.title)}
           </div>`;
 }
@@ -307,7 +315,7 @@ function blockHTML(t, overlapping) {
   return `
     <div class="sched-block ${overlapping ? 'overlap' : ''} ${t.done ? 'done' : ''}" data-action="edit" data-id="${t.id}"
          data-sched-block-id="${t.id}"
-         style="top:${top}px;height:${hgt}px;background:${col.bg};border-color:${col.border};color:${col.text};--card-glow:${col.border}">
+         style="top:${top}px;height:${hgt}px;background:${vividBg(col, 0.30)};border-color:${col.border};border-left-color:${col.text};color:${col.text};--card-glow:${col.text}">
       <div class="sched-block-time">${esc(t.schedStart)}–${esc(endHHMM)}</div>
       <div class="sched-block-title">${esc(t.title)}</div>
     </div>`;
@@ -345,19 +353,67 @@ function wireBlocks() {
   document.querySelectorAll('.sched-block[data-sched-block-id]:not(.done)').forEach(attachBlockDrag);
 }
 
+/** Única fuente de verdad para "a qué día/horario corresponde esta posición
+ * del puntero". La usan tanto el ghost de preview (en vivo, durante el drag)
+ * como commitDrop (al soltar) — así el preview nunca puede mostrar algo
+ * distinto de lo que termina guardándose. */
+function computeDropTarget(clientX, clientY, allTracks) {
+  let destTrack = null;
+  for (const tr of allTracks) {
+    const r = tr.getBoundingClientRect();
+    if (clientX >= r.left && clientX <= r.right) { destTrack = tr; break; }
+  }
+  if (!destTrack) return null;
+  const rect    = destTrack.getBoundingClientRect();
+  const offsetY = clientY - rect.top;
+  let minutes   = Math.round((offsetY / ROW_H) * 60);
+  minutes       = Math.max(0, Math.min(minutes, 23 * 60 + 59));
+  minutes       = Math.round(minutes / SNAP_MIN) * SNAP_MIN;
+  const h = Math.floor(minutes / 60), m = minutes % 60;
+  const newStart = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+  return { destTrack, newStart, newDate: destTrack.dataset.schedTrack };
+}
+
+function buildGhost() {
+  const el = document.createElement('div');
+  el.className = 'sched-ghost';
+  el.innerHTML = `<span class="sched-ghost-time"></span>`;
+  el.style.display = 'none';
+  return el;
+}
+
+function updateGhost(ghostEl, durationMin, clientX, clientY, allTracks) {
+  const target = computeDropTarget(clientX, clientY, allTracks);
+  if (!target) { ghostEl.style.display = 'none'; return; }
+  if (ghostEl.parentElement !== target.destTrack) target.destTrack.appendChild(ghostEl);
+  const startMin = hhmmToMin(target.newStart);
+  const endHHMM  = addMinutesToTime(target.newStart, durationMin);
+  ghostEl.style.display = 'flex';
+  ghostEl.style.top     = `${(startMin / 60) * ROW_H}px`;
+  ghostEl.style.height  = `${Math.max(durationMin / 60 * ROW_H, 22)}px`;
+  ghostEl.querySelector('.sched-ghost-time').textContent = `${target.newStart}–${endHHMM}`;
+}
+
 function attachBlockDrag(blockEl) {
   const id        = blockEl.dataset.schedBlockId;
   const THRESHOLD = 6;
   let startX = 0, startY = 0, dragging = false, moved = false;
-  let trackEl = null, allTracks = [];
+  let allTracks = [];
+  let ghostEl   = null;
+  let durationMin = 30;
 
   blockEl.addEventListener('pointerdown', e => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     startX = e.clientX; startY = e.clientY;
     dragging = false; moved = false;
-    trackEl = blockEl.closest('[data-sched-track]');
+    const trackEl = blockEl.closest('[data-sched-track]');
     if (!trackEl) return;
     allTracks = Array.from(document.querySelectorAll('[data-sched-track]'));
+    // La duración sale de la tarea real (state), no del alto en píxeles del
+    // bloque — el alto se clampea a un mínimo visual de 22px para tareas muy
+    // cortas, así que medir el DOM daría una duración incorrecta.
+    const t0 = state.tasks.find(x => x.id === id);
+    durationMin = t0 ? (t0.schedDuration || 30) : 30;
     blockEl.setPointerCapture(e.pointerId);
 
     const onMove = mv => {
@@ -365,8 +421,12 @@ function attachBlockDrag(blockEl) {
       if (!dragging && Math.hypot(dx, dy) > THRESHOLD) {
         dragging = true; moved = true;
         blockEl.classList.add('sched-dragging');
+        ghostEl = buildGhost();
       }
-      if (dragging) blockEl.style.transform = `translate(${dx}px, ${dy}px)`;
+      if (dragging) {
+        blockEl.style.transform = `translate(${dx}px, ${dy}px)`;
+        updateGhost(ghostEl, durationMin, mv.clientX, mv.clientY, allTracks);
+      }
     };
 
     const onUp = up => {
@@ -375,6 +435,7 @@ function attachBlockDrag(blockEl) {
       blockEl.removeEventListener('pointerup', onUp);
       blockEl.style.transform = '';
       blockEl.classList.remove('sched-dragging');
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
       if (dragging) commitDrop(id, up, allTracks);
     };
 
@@ -391,26 +452,13 @@ function attachBlockDrag(blockEl) {
 }
 
 function commitDrop(id, pointerEvent, allTracks) {
-  let destTrack = null;
-  for (const tr of allTracks) {
-    const r = tr.getBoundingClientRect();
-    if (pointerEvent.clientX >= r.left && pointerEvent.clientX <= r.right) { destTrack = tr; break; }
-  }
-  if (!destTrack) return;
-
-  const destRect = destTrack.getBoundingClientRect();
-  const offsetY  = pointerEvent.clientY - destRect.top;
-  let minutes    = Math.round((offsetY / ROW_H) * 60);
-  minutes        = Math.max(0, Math.min(minutes, 23 * 60 + 59));
-  minutes        = Math.round(minutes / SNAP_MIN) * SNAP_MIN;
-  const h = Math.floor(minutes / 60), m = minutes % 60;
-  const newStart = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
-  const newDate  = destTrack.dataset.schedTrack;
+  const target = computeDropTarget(pointerEvent.clientX, pointerEvent.clientY, allTracks);
+  if (!target) return; // se soltó fuera de cualquier pista — no se mueve nada
 
   const t = state.tasks.find(x => x.id === id);
   if (!t) return;
-  t.schedDate  = newDate;
-  t.schedStart = newStart;
+  t.schedDate  = target.newDate;
+  t.schedStart = target.newStart;
   api({ action: 'updateTask', task: JSON.stringify(t) });
   renderScheduleView();
   showToast('Tarea reagendada');

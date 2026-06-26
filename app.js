@@ -5,7 +5,9 @@ import { LKEY, SECRET }                                   from './storage.js';
 import { init, setupDrag, setupSwipe,
          addToday, removeToday, toggleDone,
          doDelete, editTask, openTaskModal,
-         closeTaskModal, saveTask }                       from './tasks.js';
+         closeTaskModal, saveTask,
+         applySchedPreset, clearSchedPresetActive,
+         reapplySchedPreset }                              from './tasks.js';
 import { openCatModal, closeCatModal, saveCategory,
          deleteCompletedTasks, confirmDelCat,
          openRenameCatModal, closeRenameCatModal,
@@ -122,6 +124,12 @@ document.getElementById('rename-cat-cancel-btn').addEventListener('click', close
 document.getElementById('rename-cat-save-btn').addEventListener('click', saveRenameCategory);
 
 document.getElementById('f-due').addEventListener('input', e => onDueInput(e.target));
+
+document.querySelectorAll('[data-sched-preset]').forEach(btn => {
+  btn.addEventListener('click', () => applySchedPreset(Number(btn.dataset.schedPreset)));
+});
+document.getElementById('f-sched-end').addEventListener('input', clearSchedPresetActive);
+document.getElementById('f-sched-start').addEventListener('input', reapplySchedPreset);
 
 // Calendar toggle — capture phase para que cierre antes que otros handlers
 document.addEventListener('click', e => {

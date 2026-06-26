@@ -182,8 +182,17 @@
       <div class="sched-modal-row">
         <input type="date" id="f-sched-date" class="sched-date-inp" />
         <input type="time" id="f-sched-start" class="sched-time-inp" />
-        <span class="sched-time-sep">a</span>
-        <input type="time" id="f-sched-end" class="sched-time-inp" />
+      </div>
+      <div class="sched-duration-row">
+        <div class="sched-duration-presets" id="sched-duration-presets">
+          <button type="button" class="sched-preset-btn" data-sched-preset="30">Corta · 30 min</button>
+          <button type="button" class="sched-preset-btn" data-sched-preset="60">Media · 1 h</button>
+          <button type="button" class="sched-preset-btn" data-sched-preset="120">Larga · 2 h</button>
+        </div>
+        <div class="sched-duration-custom">
+          <span class="sched-time-sep">hasta</span>
+          <input type="time" id="f-sched-end" class="sched-time-inp" title="Para una tarea con duración fuera de lo común, poné la hora de fin a mano" />
+        </div>
       </div>
       <div class="date-hint" id="sched-hint"></div>
     </div>

@@ -1827,6 +1827,49 @@ body {
 .sched-modal-row .sched-date-inp { flex: 1.3; }
 .sched-modal-row .sched-time-inp { flex: 1; }
 
+.sched-duration-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.sched-duration-presets {
+  display: flex;
+  gap: 2px;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  padding: 3px;
+}
+
+.sched-preset-btn {
+  background: transparent;
+  border: none;
+  border-radius: 999px;
+  color: var(--text2);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.6875rem;
+  padding: 6px 11px;
+  cursor: pointer;
+  transition: all .14s;
+  white-space: nowrap;
+}
+
+.sched-preset-btn:hover  { color: var(--text); }
+.sched-preset-btn.active {
+  background: var(--accent);
+  color: var(--accent-text);
+  font-weight: 500;
+}
+
+.sched-duration-custom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .sched-time-sep {
   color: var(--text3);
   font-size: 0.75rem;
@@ -1989,9 +2032,10 @@ body {
 
 .sched-chip {
   font-size: 0.625rem;
-  padding: 2px 5px;
+  padding: 2px 5px 2px 7px;
   border-radius: 5px;
   border: 1px solid;
+  border-left-width: 3px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2124,7 +2168,8 @@ body {
   right: 3px;
   border-radius: 6px;
   border: 1px solid;
-  padding: 3px 6px;
+  border-left-width: 4px;
+  padding: 3px 6px 3px 8px;
   overflow: hidden;
   cursor: grab;
   touch-action: none; /* el drag propio maneja el gesto, sin scroll nativo de por medio */
@@ -2140,7 +2185,35 @@ body {
 .sched-block.sched-dragging {
   cursor: grabbing;
   box-shadow: var(--shadow-md);
+  opacity: .85;
   z-index: 5;
+}
+
+/* Bloque fantasma: muestra dónde y a qué hora va a quedar mientras arrastrás.
+   pointer-events:none para que nunca intercepte el click-to-create del track. */
+.sched-ghost {
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  border: 2px dashed var(--accent);
+  background: var(--accent-dim);
+  border-radius: 6px;
+  pointer-events: none;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sched-ghost-time {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--accent);
+  background: var(--surface);
+  padding: 1px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
 }
 
 .sched-block.overlap { outline: 2px solid var(--yellow); outline-offset: -2px; }

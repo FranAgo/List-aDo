@@ -305,6 +305,37 @@ export function setupSwipe(listEl, viewCat) {
 }
 
 // ─── TASK CRUD ─────────────────────────────────────────────────────────────────
+const PRESET_MINUTES = [30, 60, 120];
+
+/** Click en un preset (Corta/Media/Larga): calcula la hora de fin a partir
+ * de la hora de inicio + el preset, y marca ese botón como activo. */
+export function applySchedPreset(minutes) {
+  const startInp = document.getElementById('f-sched-start');
+  const endInp   = document.getElementById('f-sched-end');
+  if (!startInp || !endInp) return;
+  if (!startInp.value) { showToast('Primero poné la hora de inicio'); return; }
+  endInp.value = addMinutesToTime(startInp.value, minutes);
+  document.querySelectorAll('[data-sched-preset]').forEach(b => {
+    b.classList.toggle('active', Number(b.dataset.schedPreset) === minutes);
+  });
+}
+
+/** El usuario tocó la hora de fin a mano → deja de ser un preset, es duración custom. */
+export function clearSchedPresetActive() {
+  document.querySelectorAll('[data-sched-preset]').forEach(b => b.classList.remove('active'));
+}
+
+/** Si hay un preset activo y cambiás la hora de inicio, la hora de fin se
+ * recalcula para mantener esa misma duración (no queda pegada al horario viejo). */
+export function reapplySchedPreset() {
+  const active = document.querySelector('[data-sched-preset].active');
+  if (!active) return;
+  const startInp = document.getElementById('f-sched-start');
+  if (!startInp || !startInp.value) return;
+  const endInp = document.getElementById('f-sched-end');
+  if (endInp) endInp.value = addMinutesToTime(startInp.value, Number(active.dataset.schedPreset));
+}
+
 export function openTaskModal(task, preset) {
   state.editingId = task ? task.id : null;
   document.getElementById('task-modal-title').textContent = task ? 'Editar tarea' : 'Nueva tarea';
@@ -323,6 +354,11 @@ export function openTaskModal(task, preset) {
   if (schedEndInp)   schedEndInp.value   = (task && task.schedStart && task.schedDuration)
     ? addMinutesToTime(task.schedStart, task.schedDuration)
     : (preset?.start ? addMinutesToTime(preset.start, 30) : '');
+  clearSchedPresetActive();
+  const initialDuration = task ? task.schedDuration : (preset?.start ? 30 : null);
+  if (initialDuration && PRESET_MINUTES.includes(initialDuration)) {
+    document.querySelector(`[data-sched-preset="${initialDuration}"]`)?.classList.add('active');
+  }
   const schedHint = document.getElementById('sched-hint');
   if (schedHint) schedHint.textContent = '';
   const sel = document.getElementById('f-category');
