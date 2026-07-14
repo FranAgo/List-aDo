@@ -4,7 +4,7 @@
 import { state }                              from './state.js';
 import { api }                                from './api.js';
 import { parseLocalDate, parseUserDate,
-         isoToDisplay, normalizeToISO,
+         isoToDisplay, normalizeToISO, normalizeToHHMM,
          minutesBetween, addMinutesToTime }              from './dates.js';
 import { renderCatBar, renderView, updateStats,
          showToast, showToastUndo, showToastConfirm,
@@ -46,7 +46,12 @@ export async function init() {
   }
 
   if (Array.isArray(tks)) {
-    state.tasks = tks.map(t => ({ ...t, due: normalizeToISO(t.due), schedDate: t.schedDate ? normalizeToISO(t.schedDate) : '' }));
+    state.tasks = tks.map(t => ({
+      ...t,
+      due:        normalizeToISO(t.due),
+      schedDate:  t.schedDate  ? normalizeToISO(t.schedDate)  : '',
+      schedStart: t.schedStart ? normalizeToHHMM(t.schedStart) : '',
+    }));
     state.tasks.forEach(t => { if (t.today) state.todayIds.add(t.id); });
     // Purgar IDs de tareas eliminadas del todayIds
     const existingIds = new Set(state.tasks.map(t => t.id));

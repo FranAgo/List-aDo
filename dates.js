@@ -106,6 +106,41 @@ function parseHHMM(hhmm) {
   return h * 60 + mi;
 }
 
+/**
+ * Normaliza un valor de hora (schedStart) que viene de la API → "HH:MM", o '' si inválido.
+ *
+ * RED DE SEGURIDAD, no parche de un bug de backend:
+ * el Apps Script (revisado por Bob) ya formatea schedStart correctamente con
+ * Utilities.formatDate(value, tz, 'HH:mm') antes de devolverlo — el síntoma
+ * de la captura de Franco (ISO con fecha epoch 1899-12-30, ej.
+ * "1899-12-30T23:01:48.000Z") es consistente con un deployment de Apps Script
+ * desactualizado que no tiene ese fix publicado (ver Roy — redeploy).
+ *
+ * Esta función queda como defensa en profundidad para el caso en que, por
+ * cualquier motivo (deploy viejo, columna aún sin auto-convertir, fila legacy),
+ * vuelva a llegar un ISO crudo en vez de "HH:MM". Reconstruye la hora local
+ * asumiendo timezone fija de Argentina (UTC-3, sin horario de verano) — si
+ * algún día se usa la app desde otro huso horario esto daría una hora
+ * incorrecta, así que no reemplaza el fix del lado del servidor.
+ */
+const AR_UTC_OFFSET_HOURS = 3; // Argentina no tiene horario de verano
+
+export function normalizeToHHMM(raw) {
+  if (!raw) return '';
+  raw = String(raw).trim();
+  if (/^([01]\d|2[0-3]):[0-5]\d$/.test(raw)) return raw;
+  const isoMatch = raw.match(/^\d{4}-\d{2}-\d{2}T(\d{2}):(\d{2}):(\d{2})/);
+  if (!isoMatch) return '';
+  let h  = parseInt(isoMatch[1], 10);
+  let mi = parseInt(isoMatch[2], 10);
+  const sec = parseInt(isoMatch[3], 10);
+  if (sec >= 30) mi += 1; // redondeo del drift de punto flotante del serial de Sheets
+  let totalMin = h * 60 + mi - AR_UTC_OFFSET_HOURS * 60;
+  totalMin = ((totalMin % 1440) + 1440) % 1440; // wrap-around 24h
+  const hh = Math.floor(totalMin / 60), mm = totalMin % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+}
+
 /** Minutos entre dos horarios "HH:MM" del mismo día. NaN si alguno es inválido. */
 export function minutesBetween(startHHMM, endHHMM) {
   const s = parseHHMM(startHHMM), e = parseHHMM(endHHMM);
