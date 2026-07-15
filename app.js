@@ -1,7 +1,7 @@
 // ─── app.js ────────────────────────────────────────────────────────────────────
 // Punto de entrada único. Boot, autenticación, event listeners, atajos de teclado.
 
-import { LKEY, SECRET }                                   from './storage.js';
+import { LKEY, SECRET, APP_VERSION }                      from './storage.js';
 import { init, setupDrag, setupSwipe,
          addToday, removeToday, toggleDone,
          doDelete, editTask, openTaskModal,
@@ -35,6 +35,11 @@ window._renderScheduleView = renderScheduleView;
 // commitPendingUndo necesita llamar a api — se registra el callback aquí.
 // (ui.js no importa api.js para no crear una dependencia cruzada innecesaria)
 window._apiDeleteTask = (id) => api({ action: 'deleteTask', id });
+
+// ─── VERSIÓN EN TOPBAR ──────────────────────────────────────────────────────────
+// Fuente única: APP_VERSION en storage.js. No depende de login — el elemento
+// existe en el DOM aunque #app-screen todavía esté oculto.
+document.getElementById('topbar-version').textContent = `v${APP_VERSION}`;
 
 // ─── AUTH ──────────────────────────────────────────────────────────────────────
 function doLogin() {

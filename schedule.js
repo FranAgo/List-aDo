@@ -187,13 +187,14 @@ function renderMonth() {
     const overlapSet = overlapIds(dayTasks);
     const MAX_VISIBLE = 3;
     const visible   = dayTasks.slice(0, MAX_VISIBLE);
-    const extra     = dayTasks.length - visible.length;
+    const hidden    = dayTasks.slice(MAX_VISIBLE);
+    const extra     = hidden.length;
     cells += `
       <div class="sched-month-cell ${isToday ? 'today' : ''}" data-sched-day="${iso}">
         <div class="sched-month-daynum ${isToday ? 'sched-daynum-today' : ''}">${d}</div>
         <div class="sched-month-chips">
           ${visible.map(t => chipHTML(t, overlapSet.has(t.id))).join('')}
-          ${extra > 0 ? `<div class="sched-more" data-sched-day="${iso}">+${extra} más</div>` : ''}
+          ${extra > 0 ? `<div class="sched-more" data-sched-day="${iso}">${overflowDotsHTML(hidden)}+${extra} más</div>` : ''}
         </div>
       </div>`;
   }
@@ -205,6 +206,60 @@ function renderMonth() {
     </div>`;
 
   wireMonthCells();
+  animateMonthChipsIn();
+}
+
+/**
+ * Cluster de hasta 4 puntos de color, uno por categoría distinta entre las
+ * tareas ocultas detrás de "+N más" — deja ver de un vistazo qué tipo de
+ * tareas hay sin tener que entrar al día. Tope de 4: pasado eso, más puntos
+ * dejan de aportar información legible a ese tamaño.
+ */
+function overflowDotsHTML(hiddenTasks) {
+  const seen = new Set();
+  const dots = [];
+  for (const t of hiddenTasks) {
+    const cat = t.category || '';
+    if (seen.has(cat)) continue;
+    seen.add(cat);
+    dots.push(getCatColor(cat).text);
+    if (dots.length >= 4) break;
+  }
+  if (!dots.length) return '';
+  return `<span class="sched-more-dots">${dots.map(c => `<span class="sched-more-dot" style="background:${c}"></span>`).join('')}</span>`;
+}
+
+/**
+ * Stagger de entrada para los chips al (re)renderizar la vista mes: cambio de
+ * mes, "Hoy", o primer ingreso a Calendario. Usa GSAP si ya está cargado
+ * (index.html lo carga async, puede no estar listo todavía) y cae a un
+ * fallback en CSS puro si no. `stagger.amount` en vez de `stagger.each`
+ * a propósito: un mes cargado puede tener ~90 chips, y con un delay fijo
+ * por ítem la última fila tardaría más de un segundo en aparecer. `amount`
+ * reparte un tiempo total fijo entre todos, así que la animación no se
+ * alarga con la cantidad de tareas — mismo criterio en el fallback (delay
+ * tope de 260ms en vez de crecer sin límite).
+ */
+function animateMonthChipsIn() {
+  const chips = document.querySelectorAll('#sched-body .sched-chip');
+  if (!chips.length) return;
+  if (typeof gsap !== 'undefined') {
+    gsap.fromTo(chips,
+      { opacity: 0, y: 6, scale: 0.96 },
+      {
+        opacity: 1, y: 0, scale: 1,
+        duration: 0.3,
+        ease: 'back.out(1.5)',
+        stagger: { amount: 0.3, from: 'start' },
+        clearProps: 'transform,opacity'
+      }
+    );
+  } else {
+    chips.forEach((c, i) => {
+      c.classList.add('anim-in');
+      c.style.animationDelay = Math.min(i * 8, 260) + 'ms';
+    });
+  }
 }
 
 function wireMonthCells() {
@@ -225,6 +280,7 @@ function wireMonthCells() {
 function chipHTML(t, overlapping) {
   const col = getCatColor(t.category || '');
   return `<div class="sched-chip ${overlapping ? 'overlap' : ''} ${t.done ? 'done' : ''}" data-action="edit" data-id="${t.id}"
+            title="${esc(t.schedStart)} — ${esc(t.title)}"
             style="background:${vividBg(col, 0.24)};border-color:${col.border};border-left-color:${col.text};color:${col.text};--card-glow:${col.text}">
             <span class="sched-chip-time">${esc(t.schedStart)}</span> ${esc(t.title)}
           </div>`;

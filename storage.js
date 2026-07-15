@@ -5,6 +5,11 @@
 export const API    = 'https://script.google.com/macros/s/AKfycbzpJgvkbJ2JQkKUwOHL1XPRMM5_eOh9SjfLEBxlKesIswJ3DXVj63q_LsmdMRXkWLBy/exec';
 export const SECRET = '20002600!?';
 
+// Versión mostrada en la topbar (ver .topbar-version en styles.css).
+// Única fuente de verdad — no hardcodear el número en ningún otro lado.
+// Al bumpear: actualizar también CHANGELOG.md con la entrada correspondiente.
+export const APP_VERSION = '1.1.0';
+
 // LocalStorage keys
 export const LKEY       = 'listado_key';
 export const TKEY       = 'listado_today';

@@ -259,6 +259,15 @@ body {
 
 .topbar-logo span { color: var(--accent); }
 
+.topbar-logo .topbar-version {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.5625rem;
+  color: var(--text3);
+  vertical-align: super;
+  margin-left: 4px;
+  letter-spacing: 0;
+}
+
 .topbar-right {
   display: flex;
   align-items: center;
@@ -1215,7 +1224,7 @@ body {
 
 .cal-grid {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 2px;
 }
 
@@ -1959,7 +1968,7 @@ body {
 /* ─── Vista mes ──────────────────────────────────────────────────────────── */
 .sched-grid-month {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
   background: var(--border);
   border: 1px solid var(--border2);
@@ -1995,10 +2004,46 @@ body {
 
 .sched-month-cell.today {
   background: linear-gradient(160deg, rgba(200, 240, 96, .14) 0%, var(--surface2) 100%);
-  box-shadow: inset 0 0 0 1px rgba(200, 240, 96, .3);
+  animation: schedTodayHalo 3.6s ease-in-out infinite;
 }
 
 .sched-month-cell.today:hover { background: linear-gradient(160deg, rgba(200, 240, 96, .2) 0%, var(--surface2) 100%); }
+
+@keyframes schedTodayHalo {
+  0%, 100% { box-shadow: inset 0 0 0 1px rgba(200, 240, 96, .3), 0 0 0 0 rgba(200, 240, 96, 0); }
+  50%      { box-shadow: inset 0 0 0 1px rgba(200, 240, 96, .55), 0 0 16px 0 rgba(200, 240, 96, .14); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-month-cell.today { animation: none; box-shadow: inset 0 0 0 1px rgba(200, 240, 96, .3); }
+}
+
+/* Fin de semana con identidad propia — mismo criterio tonal que ya usa el
+   resto de la grilla (surface/surface2/surface3), no un color nuevo que
+   compita con el acento lima reservado para "hoy". Columnas 6 y 7 (Sa/Do)
+   vía nth-child sobre los hijos directos de .sched-grid-month: header
+   (.sched-dow) y celdas del mes comparten la misma secuencia plana de 7
+   columnas, así que el mismo cálculo (7n+6 / 7n) alcanza los dos. .today
+   se excluye explícitamente para que ese estado siga ganando siempre,
+   sin depender de qué regla tenga más especificidad. */
+.sched-dow:nth-child(7n+6),
+.sched-dow:nth-child(7n) {
+  color: var(--text2);
+}
+
+.sched-month-cell:nth-child(7n+6):not(.empty):not(.today),
+.sched-month-cell:nth-child(7n):not(.empty):not(.today) {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, .045) 0%, transparent 55%),
+    linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%);
+}
+
+.sched-month-cell:nth-child(7n+6):not(.empty):not(.today):hover,
+.sched-month-cell:nth-child(7n):not(.empty):not(.today):hover {
+  background:
+    linear-gradient(160deg, rgba(255, 255, 255, .045) 0%, transparent 55%),
+    linear-gradient(160deg, var(--surface3) 0%, var(--surface2) 100%);
+}
 
 .sched-month-daynum {
   font-size: 0.6875rem;
@@ -2032,22 +2077,26 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  transition: box-shadow .15s, opacity .12s;
+  transition: box-shadow .18s ease, transform .18s ease, opacity .12s;
 }
 
-.sched-chip:hover    { box-shadow: 0 0 10px -2px var(--card-glow, transparent); }
+.sched-chip:hover    { box-shadow: 0 0 18px 1px var(--card-glow, transparent); transform: translateY(-1px); }
 .sched-chip.overlap  { outline: 2px solid var(--yellow); outline-offset: -2px; }
+.sched-chip.anim-in  { animation: taskIn .24s cubic-bezier(.25, .8, .25, 1) both; }
 
 .sched-chip.done {
   opacity: .45;
   text-decoration: line-through;
   cursor: default;
 }
-.sched-chip.done:hover { box-shadow: none; }
+.sched-chip.done:hover { box-shadow: none; transform: none; }
 
 .sched-chip-time { font-family: 'DM Mono', monospace; opacity: .8; }
 
 .sched-more {
+  display: flex;
+  align-items: center;
+  gap: 4px;
   font-size: 0.625rem;
   color: var(--text3);
   padding: 1px 5px;
@@ -2056,6 +2105,15 @@ body {
 }
 
 .sched-more:hover { color: var(--accent); }
+
+.sched-more-dots { display: flex; align-items: center; gap: 3px; flex-shrink: 0; }
+
+.sched-more-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
 
 /* ─── Vistas semana / día — compartidas ─────────────────────────────────── */
 .sched-grid-week,
