@@ -85,7 +85,14 @@ cada entrada de changelog.
   la URL y rompe `api.js`. Con clasp: `clasp version` + `clasp deploy
   --deploymentId <id_existente>`, nunca `clasp deploy` sin `--deploymentId`.
 - **Caché de GitHub Pages**: verificar con hard refresh (Ctrl+Shift+R) antes
-  de juzgar resultado visual post-deploy.
+  de juzgar resultado visual post-deploy. Peor variante: con ES modules
+  multi-archivo y `max-age=600`, entrar durante la ventana del deploy puede
+  cachear un grafo MEZCLADO (ej. `schedule.js` nuevo + `storage.js` viejo sin
+  un export nuevo) → el import falla y `app.js` muere entero: login/botones
+  muertos sin ningún error visible. Se cura solo en ≤10 min o con hard
+  refresh; si la app está instalada como PWA, cerrarla y reabrirla. Ante
+  "no anda nada y no dice nada" post-deploy, sospechar esto primero y
+  verificar con `curl` que Pages ya sirva los archivos consistentes.
 - **ES modules**: todos los `import` van al principio del archivo. Imports en
   medio del archivo generan `SyntaxError` silencioso que bloquea toda la
   ejecución.
