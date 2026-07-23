@@ -25,7 +25,7 @@ import { openTaskModal }                                  from './tasks.js';
 import { isoToDisplay, addMinutesToTime, addDaysISO,
          startOfWeekISO, todayISO }                       from './dates.js';
 
-const ROW_H     = 48; // px por hora en vista semana/día
+const ROW_H     = 56; // px por hora en vista semana/día — acoplado al gradiente de 56px en styles.css
 const SNAP_MIN  = 15; // minutos de snap al soltar un bloque arrastrado
 const DOW_LBL   = ['Lu', 'Ma', 'Mi', 'Ju', 'Vi', 'Sa', 'Do'];
 const MONTH_LBL = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];

@@ -1657,6 +1657,12 @@ body {
   color: var(--accent) !important;
 }
 
+/* "Calendario": mismo criterio — restaurar su celeste al estar activo
+   con el glass detrás (el color base viene inline desde renderCatBar). */
+.cat-bar.lg-active .cat-btn.active[data-cat-action="schedule"] {
+  color: #8cdcff !important;
+}
+
 /* ─── LIQUID GLASS PREVIEW (hover) ─────────────────────────────────────── */
 #lg-preview {
   position: absolute;
@@ -1822,7 +1828,7 @@ body {
    mini date-picker del campo de vencimiento (.cal-*, #cal-toggle-btn, etc).
    Reutiliza el lenguaje visual ya establecido (gradientes de surface, glow
    de acento, .empty/.empty-icon/.empty-hint) en vez de inventar uno nuevo.
-   ROW_H = 48px por hora — si se cambia acá, cambiar también la constante
+   ROW_H = 56px por hora — si se cambia acá, cambiar también la constante
    ROW_H en schedule.js (acoplamiento intencional, documentado en ambos lados).
    ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -1941,11 +1947,32 @@ body {
 
 .sched-switch-btn:hover { color: var(--text2); }
 
+/* Pill activa con "iluminación": specular superior (brillo de vidrio, mismo
+   truco que #lg-specular del liquid glass) + halo respirando con el acento
+   que ya usa la celda "hoy" — nada de colores nuevos. */
 .sched-switch-btn.active {
   background: var(--accent);
   color: var(--accent-text);
   font-weight: 500;
-  box-shadow: 0 2px 8px rgba(200, 240, 96, .28);
+  box-shadow: 0 2px 8px rgba(200, 240, 96, .28), inset 0 1px 0 rgba(255, 255, 255, .38);
+  animation: schedActiveGlow 3.2s ease-in-out infinite;
+}
+
+@keyframes schedActiveGlow {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(200, 240, 96, .25),
+                0 0 6px 0 rgba(200, 240, 96, .16),
+                inset 0 1px 0 rgba(255, 255, 255, .38);
+  }
+  50% {
+    box-shadow: 0 2px 10px rgba(200, 240, 96, .42),
+                0 0 16px 2px rgba(200, 240, 96, .30),
+                inset 0 1px 0 rgba(255, 255, 255, .5);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-switch-btn.active { animation: none; }
 }
 
 /* Etiqueta de período — registro distinto según vista: el mes es la vista
@@ -1970,8 +1997,8 @@ body {
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 1px;
-  background: var(--border);
-  border: 1px solid var(--border2);
+  background: var(--border3); /* líneas de la grilla más marcadas — pedido de Franco: los recuadros costaban distinguirse */
+  border: 1px solid var(--border3);
   border-radius: var(--radius);
   overflow: hidden;
   box-shadow: var(--shadow-sm);
@@ -1979,17 +2006,17 @@ body {
 
 .sched-dow {
   background: var(--surface2);
-  color: var(--text3);
+  color: var(--text2);
   font-size: 0.6875rem;
   text-transform: uppercase;
   letter-spacing: .08em;
   text-align: center;
-  padding: 8px 0;
+  padding: 9px 0;
 }
 
 .sched-month-cell {
   background: linear-gradient(160deg, var(--surface2) 0%, var(--surface) 100%);
-  min-height: 88px;
+  min-height: 104px;
   padding: 7px;
   display: flex;
   flex-direction: column;
@@ -2046,8 +2073,8 @@ body {
 }
 
 .sched-month-daynum {
-  font-size: 0.6875rem;
-  color: var(--text3);
+  font-size: 0.8125rem;
+  color: var(--text2);
   font-family: 'DM Mono', monospace;
 }
 
@@ -2136,15 +2163,16 @@ body {
   flex: 1;
   text-align: center;
   font-size: 0.6875rem;
-  color: var(--text3);
-  padding: 8px 0;
+  color: var(--text2);
+  padding: 9px 0;
   text-transform: uppercase;
   letter-spacing: .04em;
 }
 
 .sched-week-headcell span {
   font-family: 'DM Mono', monospace;
-  color: var(--text2);
+  font-size: 0.75rem;
+  color: var(--text);
   margin-left: 4px;
 }
 
@@ -2166,7 +2194,7 @@ body {
 
 .sched-scroll {
   display: flex;
-  max-height: 480px;
+  max-height: 560px;
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: rgba(200, 240, 96, 0.2) transparent;
@@ -2186,7 +2214,7 @@ body {
   text-align: right;
   padding: 5px 8px 0 0;
   box-sizing: border-box;
-  border-top: 1px solid var(--border);
+  border-top: 1px solid var(--border2);
 }
 
 .sched-week-cols { display: flex; flex: 1; }
@@ -2199,10 +2227,10 @@ body {
   background-color: var(--surface);
   background-image: repeating-linear-gradient(
     to bottom,
-    var(--border) 0, var(--border) 1px,
-    transparent 1px, transparent 48px
+    var(--border2) 0, var(--border2) 1px,
+    transparent 1px, transparent 56px
   );
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--border2);
   cursor: pointer;
 }
 
@@ -2299,37 +2327,54 @@ body {
 
 .sched-layout > #sched-body { flex: 1; min-width: 0; }
 
+/* Misma altura visual que los grupos pill vecinos (nav y switch: 26px de
+   botón + 3px de padding + borde = 34px) para que no "choque" por finito. */
 .sched-panel-btn {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  height: 26px;
-  padding: 0 12px;
+  gap: 7px;
+  height: 34px;
+  padding: 0 8px 0 14px;
   border: 1px solid var(--border2);
   border-radius: 999px;
   background: var(--surface2);
-  color: var(--text3);
+  color: var(--text2);
   font-size: 0.75rem;
-  font-family: inherit;
+  font-weight: 500;
+  font-family: 'DM Sans', sans-serif;
   cursor: pointer;
-  transition: color .15s, background .15s, border-color .15s;
+  transition: color .15s, background .15s, border-color .15s, box-shadow .15s;
 }
 
-.sched-panel-btn:hover  { color: var(--text2); background: var(--surface3); }
+.sched-panel-btn:hover  { color: var(--text); background: var(--surface3); border-color: var(--border3); }
 .sched-panel-btn.active {
   color: var(--accent);
   border-color: var(--accent);
   background: var(--accent-dim);
+  box-shadow: 0 0 12px -2px rgba(200, 240, 96, .35);
 }
 
 .sched-panel-count {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--surface3);
+  color: var(--text2);
   font-family: 'DM Mono', monospace;
   font-size: 0.625rem;
-  opacity: .75;
+}
+
+.sched-panel-btn.active .sched-panel-count {
+  background: var(--accent);
+  color: var(--accent-text);
 }
 
 .sched-panel {
-  width: 220px;
+  width: 240px;
   flex-shrink: 0;
   border: 1px solid var(--border2);
   border-radius: var(--radius);
@@ -2358,8 +2403,8 @@ body {
   background-size: 13px 13px;
   border: 1px solid var(--border2);
   border-radius: 8px;
-  padding: 5px 26px 5px 9px;
-  font-size: 0.6875rem;
+  padding: 7px 28px 7px 10px;
+  font-size: 0.75rem;
   color: var(--text2);
   font-family: 'DM Sans', sans-serif;
   outline: none;
@@ -2387,22 +2432,53 @@ body {
 }
 
 .sched-panel-item {
+  position: relative;
+  overflow: hidden; /* contiene el barrido specular del ::after */
   border: 1px solid var(--border2);
   border-left: 4px solid;
   border-radius: 8px;
   background: var(--surface2);
-  padding: 7px 9px;
+  padding: 8px 10px;
   cursor: grab;
   user-select: none;
   /* pan-x: en mobile la bandeja scrollea horizontal con gesto nativo,
      y el gesto vertical (hacia la grilla) queda para el drag propio. */
   touch-action: pan-x;
-  transition: transform .15s cubic-bezier(.25, .8, .25, 1), box-shadow .15s;
+  transition: transform .15s cubic-bezier(.25, .8, .25, 1), box-shadow .15s, border-color .15s;
+}
+
+/* Barrido specular al hover — el "brillo de vidrio" del liquid glass hecho
+   con un gradiente que cruza el ítem, sin backdrop-filter (demasiado caro
+   para una lista entera de ítems). */
+.sched-panel-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(115deg,
+    transparent 30%,
+    rgba(255, 255, 255, .06) 44%,
+    rgba(255, 255, 255, .13) 50%,
+    rgba(255, 255, 255, .06) 56%,
+    transparent 70%);
+  transform: translateX(-130%);
+  pointer-events: none;
+}
+
+.sched-panel-item:hover::after {
+  transform: translateX(130%);
+  transition: transform .55s ease;
 }
 
 .sched-panel-item:hover {
   transform: translateY(-1px);
-  box-shadow: 0 0 14px -3px var(--card-glow, transparent), var(--shadow-sm);
+  border-color: var(--card-glow, var(--border3));
+  box-shadow: 0 0 16px -2px var(--card-glow, transparent),
+              inset 0 1px 0 rgba(255, 255, 255, .05),
+              var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sched-panel-item::after { display: none; }
 }
 
 .sched-panel-item.sched-panel-dragging { opacity: .35; cursor: grabbing; }
@@ -2467,7 +2543,7 @@ body {
   .sched-label            { font-size: 1.15rem; }
   .sched-toolbar          { width: 100%; }
   .sched-toolbar .new-task-btn { margin-left: 0; width: 100%; text-align: center; order: 3; }
-  .sched-month-cell       { min-height: 56px; padding: 4px; }
+  .sched-month-cell       { min-height: 64px; padding: 4px; }
   .sched-chip             { font-size: 0.5625rem; }
   .sched-hourcol,
   .sched-hourcol-spacer   { width: 38px; }

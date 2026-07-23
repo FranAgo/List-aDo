@@ -63,7 +63,10 @@ export function renderCatBar() {
 
   const todayCount = state.tasks.filter(t => state.todayIds.has(t.id) && !t.done).length;
   let h = `<button class="cat-btn ${state.currentCat==='today'?'active':''}" data-cat-action="today">Tareas de hoy <span class="cat-count">${todayCount}</span></button>`;
-  h += `<button class="cat-btn ${state.currentCat==='schedule'?'active':''}" data-cat-action="schedule">Calendario</button>`;
+  // Celeste pastel fijo (mismo tono que el último color de CAT_PALETTE) —
+  // hardcodeado a propósito: no pasa por assignCatColor para no consumirle
+  // un slot de la paleta a las listas reales.
+  h += `<button class="cat-btn ${state.currentCat==='schedule'?'active':''}" style="border-color:rgba(140,220,255,0.35);color:#8cdcff;" data-cat-action="schedule">Calendario</button>`;
 
   state.listOrder.forEach((c, i) => {
     const n      = state.tasks.filter(t => t.category===c && !t.done && !state.todayIds.has(t.id)).length;

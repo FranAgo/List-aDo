@@ -16,6 +16,19 @@ Si una sección no aplica en una entrega, no aparece — no se dejan secciones v
 
 ---
 
+## [1.4.0] - 2026-07-23
+
+### Mejoras entregadas
+
+- Vista Calendario (grilla mes): celdas más altas (88→104px), líneas de grilla más marcadas (`--border3`) y números de día más grandes y contrastados — pedido de Franco: los recuadros y números costaban distinguirse.
+- Vista Calendario (semana/día): hora más alta (48→56px por fila), líneas horarias y bordes de columna más visibles, números del encabezado de semana con más contraste y área de scroll más alta.
+- Vista Calendario (toolbar): el botón "Sin agendar" ahora tiene el mismo alto que los grupos vecinos (ya no "choca" por finito), tipografía con más peso y el contador como badge redondo — que se rellena de acento cuando el panel está abierto.
+- Vista Calendario (toolbar): la pill activa de Mes/Semana/Día ganó iluminación tipo liquid glass — brillo specular superior y halo respirando con el acento lima ya existente (respeta `prefers-reduced-motion`).
+- Panel "Sin agendar": panel más ancho (220→240px), selector de lista con más aire, e ítems con hover iluminado — glow del color de su lista y barrido specular estilo liquid glass (hecho con gradiente, sin `backdrop-filter`, para no castigar el rendimiento de la lista; respeta `prefers-reduced-motion`).
+- Cat-bar: el botón "Calendario" ahora tiene color propio asignado (celeste pastel), incluso al estar activo con el liquid glass detrás — mismo mecanismo que ya usaba "Tareas de hoy".
+
+---
+
 ## [1.3.0] - 2026-07-23
 
 ### Mejoras entregadas
