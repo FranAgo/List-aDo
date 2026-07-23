@@ -118,6 +118,14 @@ export function renderScheduleView() {
   if (!vc) return;
   const view = state.scheduleView || 'month';
   const unsched = unscheduledTasks();
+  // Si la lista filtrada ya no existe (renombrada/eliminada), volver a "Todas"
+  // en silencio — nunca dejar el panel apuntando a un nombre muerto.
+  if (state.schedPanelCat !== 'all' && !state.categories.includes(state.schedPanelCat)) {
+    state.schedPanelCat = 'all';
+  }
+  const panelTasks = state.schedPanelCat === 'all'
+    ? unsched
+    : unsched.filter(t => t.category === state.schedPanelCat);
 
   const emptyBanner = !hasAnyScheduled() ? `
     <div class="empty sched-empty">
@@ -155,7 +163,7 @@ export function renderScheduleView() {
     <div class="sched-label" id="sched-label"></div>
     ${emptyBanner}
     <div class="sched-layout">
-      ${state.schedPanelOpen ? schedPanelHTML(unsched) : ''}
+      ${state.schedPanelOpen ? schedPanelHTML(panelTasks, unsched) : ''}
       <div id="sched-body"></div>
     </div>`;
 
@@ -552,8 +560,20 @@ function commitDrop(id, pointerEvent, allTracks) {
 // agendarlas. Cerrado por defecto y persistido en localStorage: si no se usa,
 // la vista Calendario queda exactamente igual que sin esta feature.
 
-function schedPanelHTML(unsched) {
-  const items = unsched.map(t => {
+/** @param panelTasks tareas ya filtradas por la lista elegida
+ *  @param allUnsched  todas las sin agendar — alimenta los contadores del select */
+function schedPanelHTML(panelTasks, allUnsched) {
+  const counts = {};
+  allUnsched.forEach(t => { counts[t.category] = (counts[t.category] || 0) + 1; });
+  const opts = [
+    `<option value="all" ${state.schedPanelCat === 'all' ? 'selected' : ''}>Todas las listas (${allUnsched.length})</option>`,
+    ...state.listOrder.map(c =>
+      `<option value="${esc(c)}" ${state.schedPanelCat === c ? 'selected' : ''}>${esc(c)} (${counts[c] || 0})</option>`),
+  ].join('');
+  const emptyMsg = state.schedPanelCat === 'all'
+    ? 'No queda nada por agendar.'
+    : 'Nada sin agendar en esta lista.';
+  const items = panelTasks.map(t => {
     const col = getCatColor(t.category || '');
     const due = t.due ? `<span class="sched-panel-due">${isoToDisplay(t.due)}</span>` : '';
     return `
@@ -567,13 +587,19 @@ function schedPanelHTML(unsched) {
   return `
     <aside class="sched-panel" id="sched-panel">
       <div class="sched-panel-head">Sin agendar</div>
-      <div class="sched-panel-list">${items || `<div class="sched-panel-empty">No queda nada por agendar.</div>`}</div>
+      <select class="sched-panel-filter" id="sched-panel-filter" title="Filtrar por lista">${opts}</select>
+      <div class="sched-panel-list">${items || `<div class="sched-panel-empty">${emptyMsg}</div>`}</div>
       <div class="sched-panel-hint">Arrastrá una tarea a la grilla para darle día y horario.</div>
     </aside>`;
 }
 
 function wirePanelItems() {
   document.querySelectorAll('.sched-panel-item[data-sched-unsched]').forEach(attachPanelItemDrag);
+  const filterSel = document.getElementById('sched-panel-filter');
+  if (filterSel) filterSel.addEventListener('change', () => {
+    state.schedPanelCat = filterSel.value;
+    renderScheduleView();
+  });
 }
 
 /** ¿El puntero está sobre el área visible de la grilla horaria (semana/día)?

@@ -51,4 +51,8 @@ export const state = {
   // Panel "Sin agendar" de la sección Calendario.
   // null = todavía no se leyó de localStorage (se hidrata en renderScheduleView).
   schedPanelOpen: null,
+
+  // Filtro de lista del panel "Sin agendar". 'all' = todas las listas.
+  // Vive solo en memoria (no se persiste): es un filtro contextual de sesión.
+  schedPanelCat: 'all',
 };

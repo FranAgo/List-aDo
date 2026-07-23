@@ -2347,6 +2347,35 @@ body {
   padding-left: 2px;
 }
 
+/* Filtro por lista — versión compacta del select del modal (.field select) */
+.sched-panel-filter {
+  width: 100%;
+  margin-bottom: 8px;
+  background-color: var(--surface2);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%238a8784' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  background-size: 13px 13px;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  padding: 5px 26px 5px 9px;
+  font-size: 0.6875rem;
+  color: var(--text2);
+  font-family: 'DM Sans', sans-serif;
+  outline: none;
+  transition: border-color .12s, box-shadow .12s;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+}
+
+.sched-panel-filter option { background: var(--surface2); }
+
+.sched-panel-filter:focus {
+  border-color: rgba(200, 240, 96, .55);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+
 .sched-panel-list {
   display: flex;
   flex-direction: column;

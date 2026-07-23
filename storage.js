@@ -8,7 +8,7 @@ export const SECRET = '20002600!?';
 // Versión mostrada en la topbar (ver .topbar-version en styles.css).
 // Única fuente de verdad — no hardcodear el número en ningún otro lado.
 // Al bumpear: actualizar también CHANGELOG.md con la entrada correspondiente.
-export const APP_VERSION = '1.2.0';
+export const APP_VERSION = '1.3.0';
 
 // LocalStorage keys
 export const LKEY       = 'listado_key';

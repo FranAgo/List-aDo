@@ -16,6 +16,14 @@ Si una sección no aplica en una entrega, no aparece — no se dejan secciones v
 
 ---
 
+## [1.3.0] - 2026-07-23
+
+### Mejoras entregadas
+
+- Vista Calendario (panel "Sin agendar"): selector para filtrar por lista — "Todas las listas" por defecto, y cada lista con su cantidad de tareas sin agendar entre paréntesis. El contador del botón de la toolbar sigue mostrando el total sin filtrar. Si la lista elegida se renombra o elimina, el panel vuelve solo a "Todas".
+
+---
+
 ## [1.2.0] - 2026-07-23
 
 ### Mejoras entregadas
