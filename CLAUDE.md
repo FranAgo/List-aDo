@@ -106,13 +106,23 @@ cada entrada de changelog.
 
 El proyecto de Apps Script vive espejado en `gas/`, gestionado con `clasp`.
 
+- Script ID y deployment de producción confirmados: el deployment que usa
+  `api.js` (vía la URL en `storage.js`) es
+  `AKfycbzpJgvkbJ2JQkKUwOHL1XPRMM5_eOh9SjfLEBxlKesIswJ3DXVj63q_LsmdMRXkWLBy`.
+  Este es el ÚNICO deployment que se actualiza. Los otros dos que devuelve
+  `clasp deployments` (`@HEAD` y `@1 - API List-aDo`) no se tocan.
 - `gas/.clasp.json` tiene el `scriptId` y `rootDir`. Se commitea (no es secreto).
 - Las credenciales de `clasp login` van a `~/.clasprc.json` (home del usuario),
   fuera del repo — nunca deben terminar versionadas.
-- Flujo: editar en `gas/`, `clasp push` para subir a Apps Script, probar en
-  el editor web o con `clasp run` si aplica, y solo entonces `clasp version`
-  + `clasp deploy --deploymentId <id_existente>` para actualizar el Web App
-  en producción sin cambiar la URL.
+- Flujo para deployar un cambio de backend:
+
+```powershell
+clasp push
+clasp version "descripción del cambio"
+clasp deploy --deploymentId AKfycbzpJgvkbJ2JQkKUwOHL1XPRMM5_eOh9SjfLEBxlKesIswJ3DXVj63q_LsmdMRXkWLBy --versionNumber N
+```
+
+  Nunca `clasp deploy` sin `--deploymentId`.
 - Antes de cualquier `clasp push`, confirmar que nadie tocó código directo en
   script.google.com sin pasar por local — si pasó, `clasp pull` primero o se
   pisa ese cambio.
