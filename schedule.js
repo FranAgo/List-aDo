@@ -20,7 +20,7 @@
 import { state }                                          from './state.js';
 import { api }                                            from './api.js';
 import { esc, showToast }                                 from './ui.js';
-import { getCatColor }                                    from './storage.js';
+import { getCatColor, SPANEL_KEY }                        from './storage.js';
 import { openTaskModal }                                  from './tasks.js';
 import { isoToDisplay, addMinutesToTime, addDaysISO,
          startOfWeekISO, todayISO }                       from './dates.js';
@@ -37,6 +37,16 @@ function scheduledTasks() {
 
 function hasAnyScheduled() {
   return scheduledTasks().length > 0;
+}
+
+/** Tareas pendientes que todavía no tienen fecha + hora en el calendario.
+ * Orden: mismo orden de listas que la cat-bar (listOrder) y, dentro de cada
+ * lista, el orden manual de las tareas — así el panel se lee igual que la app. */
+function unscheduledTasks() {
+  const orderIdx = c => { const i = state.listOrder.indexOf(c); return i === -1 ? state.listOrder.length : i; };
+  return state.tasks
+    .filter(t => !t.done && !(t.schedDate && t.schedStart))
+    .sort((a, b) => (orderIdx(a.category) - orderIdx(b.category)) || ((a.order || 0) - (b.order || 0)));
 }
 
 function hhmmToMin(hhmm) {
@@ -103,9 +113,11 @@ export function scheduleGoToday() {
 // ─── RENDER PRINCIPAL ──────────────────────────────────────────────────────────
 export function renderScheduleView() {
   if (!state.scheduleRefDate) state.scheduleRefDate = todayISO();
+  if (state.schedPanelOpen === null) state.schedPanelOpen = localStorage.getItem(SPANEL_KEY) === '1';
   const vc = document.getElementById('view-container');
   if (!vc) return;
   const view = state.scheduleView || 'month';
+  const unsched = unscheduledTasks();
 
   const emptyBanner = !hasAnyScheduled() ? `
     <div class="empty sched-empty">
@@ -136,18 +148,26 @@ export function renderScheduleView() {
           <button class="sched-switch-btn ${view === 'week'  ? 'active' : ''}" data-sched-view="week">Semana</button>
           <button class="sched-switch-btn ${view === 'day'   ? 'active' : ''}" data-sched-view="day">Día</button>
         </div>
+        <button class="sched-panel-btn ${state.schedPanelOpen ? 'active' : ''}" data-sched-panel title="Mostrar/ocultar tareas sin agendar">Sin agendar <span class="sched-panel-count">${unsched.length}</span></button>
         <button class="new-task-btn" data-sched-new title="Nueva tarea agendada">+ Nueva</button>
       </div>
     </div>
     <div class="sched-label" id="sched-label"></div>
     ${emptyBanner}
-    <div id="sched-body"></div>`;
+    <div class="sched-layout">
+      ${state.schedPanelOpen ? schedPanelHTML(unsched) : ''}
+      <div id="sched-body"></div>
+    </div>`;
 
   wireToolbar(vc);
 
   if (view === 'month')      renderMonth();
   else if (view === 'week')  renderWeek();
   else                       renderDay();
+
+  // Después de renderizar la grilla: los ítems del panel necesitan que las
+  // pistas/celdas destino ya existan en el DOM para poder soltarse sobre ellas.
+  wirePanelItems();
 }
 
 function wireToolbar(vc) {
@@ -162,6 +182,12 @@ function wireToolbar(vc) {
   const newBtn = vc.querySelector('[data-sched-new]');
   if (newBtn) newBtn.addEventListener('click', () => {
     openTaskModal(null, { date: state.scheduleRefDate, start: '' });
+  });
+  const panelBtn = vc.querySelector('[data-sched-panel]');
+  if (panelBtn) panelBtn.addEventListener('click', () => {
+    state.schedPanelOpen = !state.schedPanelOpen;
+    localStorage.setItem(SPANEL_KEY, state.schedPanelOpen ? '1' : '0');
+    renderScheduleView();
   });
 }
 
@@ -518,4 +544,180 @@ function commitDrop(id, pointerEvent, allTracks) {
   api({ action: 'updateTask', task: JSON.stringify(t) });
   renderScheduleView();
   showToast('Tarea reagendada');
+}
+
+// ─── PANEL "SIN AGENDAR" ───────────────────────────────────────────────────────
+// Lista lateral (desktop) / bandeja horizontal (mobile) con las tareas
+// pendientes que aún no tienen fecha+hora. Se arrastran a la grilla para
+// agendarlas. Cerrado por defecto y persistido en localStorage: si no se usa,
+// la vista Calendario queda exactamente igual que sin esta feature.
+
+function schedPanelHTML(unsched) {
+  const items = unsched.map(t => {
+    const col = getCatColor(t.category || '');
+    const due = t.due ? `<span class="sched-panel-due">${isoToDisplay(t.due)}</span>` : '';
+    return `
+      <div class="sched-panel-item" data-sched-unsched="${t.id}" data-action="edit" data-id="${t.id}"
+           title="${esc(t.title)}"
+           style="border-left-color:${col.text};--card-glow:${col.text}">
+        <div class="sched-panel-item-title">${esc(t.title)}</div>
+        <div class="sched-panel-item-sub"><span style="color:${col.text}">${esc(t.category || '')}</span>${due}</div>
+      </div>`;
+  }).join('');
+  return `
+    <aside class="sched-panel" id="sched-panel">
+      <div class="sched-panel-head">Sin agendar</div>
+      <div class="sched-panel-list">${items || `<div class="sched-panel-empty">No queda nada por agendar.</div>`}</div>
+      <div class="sched-panel-hint">Arrastrá una tarea a la grilla para darle día y horario.</div>
+    </aside>`;
+}
+
+function wirePanelItems() {
+  document.querySelectorAll('.sched-panel-item[data-sched-unsched]').forEach(attachPanelItemDrag);
+}
+
+/** ¿El puntero está sobre el área visible de la grilla horaria (semana/día)?
+ * computeDropTarget solo chequea el eje X de las pistas; acá se suma el eje Y
+ * y el recorte del contenedor con scroll, porque un ítem del panel puede
+ * soltarse desde cualquier parte de la pantalla (un bloque ya agendado, en
+ * cambio, vive adentro de la grilla y no necesitaba este chequeo). */
+function pointerInGrid(clientX, clientY, allTracks) {
+  const scrollEl = document.querySelector('.sched-scroll');
+  if (scrollEl) {
+    const s = scrollEl.getBoundingClientRect();
+    if (clientY < s.top || clientY > s.bottom) return false;
+  }
+  return allTracks.some(tr => {
+    const r = tr.getBoundingClientRect();
+    return clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom;
+  });
+}
+
+/** Celda de la vista mes bajo el puntero, o null. */
+function monthCellAt(clientX, clientY, monthCells) {
+  for (const cell of monthCells) {
+    const r = cell.getBoundingClientRect();
+    if (clientX >= r.left && clientX <= r.right && clientY >= r.top && clientY <= r.bottom) return cell;
+  }
+  return null;
+}
+
+/** Clon flotante del ítem que sigue al puntero. El panel tiene overflow con
+ * scroll: transformar el ítem en el lugar (como hace el drag de bloques) lo
+ * clipearía al salir del panel — por eso un clon position:fixed en el body. */
+function buildDragProxy(itemEl) {
+  const r  = itemEl.getBoundingClientRect();
+  const el = itemEl.cloneNode(true);
+  el.classList.remove('sched-panel-dragging');
+  el.classList.add('sched-drag-proxy');
+  el.style.left  = `${r.left}px`;
+  el.style.top   = `${r.top}px`;
+  el.style.width = `${r.width}px`;
+  document.body.appendChild(el);
+  return el;
+}
+
+function attachPanelItemDrag(itemEl) {
+  const id        = itemEl.dataset.schedUnsched;
+  const THRESHOLD = 6;
+  let startX = 0, startY = 0, dragging = false, moved = false;
+  let allTracks = [], monthCells = [];
+  let ghostEl = null, proxyEl = null, hoverCell = null;
+  let durationMin = 30;
+
+  itemEl.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    startX = e.clientX; startY = e.clientY;
+    dragging = false; moved = false;
+    allTracks  = Array.from(document.querySelectorAll('[data-sched-track]'));
+    monthCells = Array.from(document.querySelectorAll('.sched-month-cell[data-sched-day]'));
+    const t0 = state.tasks.find(x => x.id === id);
+    durationMin = (t0 && t0.schedDuration) || 30;
+    itemEl.setPointerCapture(e.pointerId);
+
+    const onMove = mv => {
+      const dx = mv.clientX - startX, dy = mv.clientY - startY;
+      if (!dragging && Math.hypot(dx, dy) > THRESHOLD) {
+        dragging = true; moved = true;
+        proxyEl = buildDragProxy(itemEl);
+        ghostEl = buildGhost();
+        itemEl.classList.add('sched-panel-dragging');
+      }
+      if (dragging) {
+        proxyEl.style.transform = `translate(${dx}px, ${dy}px)`;
+        if (pointerInGrid(mv.clientX, mv.clientY, allTracks)) {
+          updateGhost(ghostEl, durationMin, mv.clientX, mv.clientY, allTracks);
+        } else {
+          ghostEl.style.display = 'none';
+        }
+        const cell = monthCellAt(mv.clientX, mv.clientY, monthCells);
+        if (cell !== hoverCell) {
+          if (hoverCell) hoverCell.classList.remove('sched-dropover');
+          if (cell) cell.classList.add('sched-dropover');
+          hoverCell = cell;
+        }
+      }
+    };
+
+    const cleanup = () => {
+      try { itemEl.releasePointerCapture(e.pointerId); } catch (err) { /* ya liberado */ }
+      itemEl.removeEventListener('pointermove', onMove);
+      itemEl.removeEventListener('pointerup', onUp);
+      itemEl.removeEventListener('pointercancel', onCancel);
+      itemEl.classList.remove('sched-panel-dragging');
+      if (proxyEl) { proxyEl.remove(); proxyEl = null; }
+      if (ghostEl) { ghostEl.remove(); ghostEl = null; }
+      if (hoverCell) { hoverCell.classList.remove('sched-dropover'); hoverCell = null; }
+    };
+
+    const onUp = up => {
+      cleanup();
+      if (dragging) commitPanelDrop(id, up, allTracks, monthCells, durationMin);
+    };
+
+    // touch-action: pan-x — si el browser decide que el gesto es un pan
+    // horizontal nativo (scroll de la bandeja en mobile), dispara pointercancel
+    // y onUp nunca corre: hay que limpiar proxy/ghost/listeners igual, sin
+    // commitear nada, y resetear moved para no comerse el próximo click.
+    const onCancel = () => {
+      cleanup();
+      dragging = false;
+      moved    = false;
+    };
+
+    itemEl.addEventListener('pointermove', onMove);
+    itemEl.addEventListener('pointerup', onUp);
+    itemEl.addEventListener('pointercancel', onCancel);
+  });
+
+  // Igual que en attachBlockDrag: si hubo drag real se cancela el click que
+  // dispararía data-action="edit" vía el delegation global de app.js.
+  itemEl.addEventListener('click', e => {
+    if (moved) { e.stopPropagation(); moved = false; }
+  });
+}
+
+function commitPanelDrop(id, pointerEvent, allTracks, monthCells, durationMin) {
+  const t = state.tasks.find(x => x.id === id);
+  if (!t) return;
+
+  // Semana/día: el drop trae día + horario exactos → se agenda directo.
+  if (pointerInGrid(pointerEvent.clientX, pointerEvent.clientY, allTracks)) {
+    const target = computeDropTarget(pointerEvent.clientX, pointerEvent.clientY, allTracks);
+    if (target) {
+      t.schedDate     = target.newDate;
+      t.schedStart    = target.newStart;
+      t.schedDuration = durationMin;
+      api({ action: 'updateTask', task: JSON.stringify(t) });
+      renderScheduleView();
+      showToast(`Agendada el ${isoToDisplay(target.newDate)} a las ${target.newStart}`);
+      return;
+    }
+  }
+
+  // Mes: la celda solo define el día — la hora la elige el usuario en el
+  // modal (no se inventa un horario). Si cancela, no cambia nada.
+  const cell = monthCellAt(pointerEvent.clientX, pointerEvent.clientY, monthCells);
+  if (cell) openTaskModal(t, { date: cell.dataset.schedDay });
+  // Soltar fuera de la grilla: no pasa nada.
 }

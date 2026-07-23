@@ -47,4 +47,8 @@ export const state = {
   // Sección Calendario — vista (mes/semana/día) y fecha de referencia visible
   scheduleView:    'month',
   scheduleRefDate: null,
+
+  // Panel "Sin agendar" de la sección Calendario.
+  // null = todavía no se leyó de localStorage (se hidrata en renderScheduleView).
+  schedPanelOpen: null,
 };

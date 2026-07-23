@@ -2290,6 +2290,149 @@ body {
   text-overflow: ellipsis;
 }
 
+/* ─── Panel "Sin agendar" ────────────────────────────────────────────────── */
+.sched-layout {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.sched-layout > #sched-body { flex: 1; min-width: 0; }
+
+.sched-panel-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border: 1px solid var(--border2);
+  border-radius: 999px;
+  background: var(--surface2);
+  color: var(--text3);
+  font-size: 0.75rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: color .15s, background .15s, border-color .15s;
+}
+
+.sched-panel-btn:hover  { color: var(--text2); background: var(--surface3); }
+.sched-panel-btn.active {
+  color: var(--accent);
+  border-color: var(--accent);
+  background: var(--accent-dim);
+}
+
+.sched-panel-count {
+  font-family: 'DM Mono', monospace;
+  font-size: 0.625rem;
+  opacity: .75;
+}
+
+.sched-panel {
+  width: 220px;
+  flex-shrink: 0;
+  border: 1px solid var(--border2);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 10px 10px 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.sched-panel-head {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+  color: var(--text3);
+  margin-bottom: 8px;
+  padding-left: 2px;
+}
+
+.sched-panel-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 480px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(200, 240, 96, 0.2) transparent;
+}
+
+.sched-panel-item {
+  border: 1px solid var(--border2);
+  border-left: 4px solid;
+  border-radius: 8px;
+  background: var(--surface2);
+  padding: 7px 9px;
+  cursor: grab;
+  user-select: none;
+  /* pan-x: en mobile la bandeja scrollea horizontal con gesto nativo,
+     y el gesto vertical (hacia la grilla) queda para el drag propio. */
+  touch-action: pan-x;
+  transition: transform .15s cubic-bezier(.25, .8, .25, 1), box-shadow .15s;
+}
+
+.sched-panel-item:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 14px -3px var(--card-glow, transparent), var(--shadow-sm);
+}
+
+.sched-panel-item.sched-panel-dragging { opacity: .35; cursor: grabbing; }
+
+.sched-panel-item-title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sched-panel-item-sub {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.625rem;
+  color: var(--text3);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.sched-panel-due { font-family: 'DM Mono', monospace; }
+
+.sched-panel-empty {
+  font-size: 0.75rem;
+  color: var(--text3);
+  padding: 6px 2px;
+}
+
+.sched-panel-hint {
+  font-size: 0.625rem;
+  color: var(--text3);
+  line-height: 1.45;
+  margin-top: 10px;
+  padding-left: 2px;
+}
+
+/* Clon flotante del ítem mientras se arrastra (ver buildDragProxy).
+   transition:none — el clon tiene que seguir al puntero sin lag, no heredar
+   la transición de hover del ítem original. */
+.sched-drag-proxy {
+  position: fixed;
+  z-index: 60;
+  margin: 0;
+  pointer-events: none;
+  opacity: .9;
+  box-shadow: var(--shadow-md);
+  transition: none;
+}
+
+/* Celda de la vista mes resaltada como destino durante el drag */
+.sched-month-cell.sched-dropover {
+  background: var(--accent-dim);
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+
 /* ─── Responsive ─────────────────────────────────────────────────────────── */
 @media (max-width: 520px) {
   .sched-label            { font-size: 1.15rem; }
@@ -2302,4 +2445,22 @@ body {
   .sched-hour-lbl         { font-size: 0.5625rem; padding-right: 5px; }
   .sched-modal-row        { flex-wrap: wrap; }
   .sched-modal-row .sched-date-inp { flex: 1 1 100%; }
+
+  /* Panel "Sin agendar" como bandeja horizontal arriba de la grilla:
+     el scroll de la bandeja es horizontal (pan-x nativo) y no compite
+     con el gesto vertical de arrastrar un ítem hacia la grilla. */
+  .sched-layout           { flex-direction: column; }
+  .sched-panel            { width: 100%; }
+  .sched-panel-list {
+    flex-direction: row;
+    max-height: none;
+    overflow-y: hidden;
+    overflow-x: auto;
+    padding-bottom: 4px;
+  }
+  .sched-panel-item {
+    min-width: 150px;
+    max-width: 190px;
+    flex-shrink: 0;
+  }
 }

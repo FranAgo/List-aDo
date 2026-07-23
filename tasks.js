@@ -354,7 +354,10 @@ export function openTaskModal(task, preset) {
   const schedDateInp  = document.getElementById('f-sched-date');
   const schedStartInp = document.getElementById('f-sched-start');
   const schedEndInp   = document.getElementById('f-sched-end');
-  if (schedDateInp)  schedDateInp.value  = task ? (task.schedDate  || '') : (preset?.date  || '');
+  // preset.date junto con una tarea existente = drop desde el panel "Sin
+  // agendar" sobre una celda de la vista mes: la fecha elegida al soltar
+  // pisa la (vacía) de la tarea; la hora la completa el usuario.
+  if (schedDateInp)  schedDateInp.value  = task ? (preset?.date || task.schedDate || '') : (preset?.date  || '');
   if (schedStartInp) schedStartInp.value = task ? (task.schedStart || '') : (preset?.start || '');
   if (schedEndInp)   schedEndInp.value   = (task && task.schedStart && task.schedDuration)
     ? addMinutesToTime(task.schedStart, task.schedDuration)

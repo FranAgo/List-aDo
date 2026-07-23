@@ -16,6 +16,22 @@ Si una sección no aplica en una entrega, no aparece — no se dejan secciones v
 
 ---
 
+## [1.2.0] - 2026-07-23
+
+### Mejoras entregadas
+
+- Vista Calendario: nuevo panel "Sin agendar" — un botón en la toolbar (con contador) muestra u oculta la lista de tareas pendientes que todavía no tienen día y horario. Cerrado por defecto y recordado entre sesiones (`localStorage`), así la vista queda igual de despejada que antes para quien no lo usa.
+- Vista Calendario (semana/día): arrastrar una tarea del panel a la grilla la agenda en ese día y horario — mismo ghost de preview y snap de 15 minutos que ya tenía el drag de bloques; duración por defecto 30 minutos.
+- Vista Calendario (mes): arrastrar una tarea del panel a un día abre el modal de edición con esa fecha precargada, para elegir la hora a mano — no se inventan horarios. Cancelar el modal no cambia nada.
+- Vista Calendario: click (sin arrastre) en un ítem del panel abre la edición de esa tarea, igual que los chips de la grilla.
+- Vista Calendario (mobile): el panel se vuelve una bandeja horizontal arriba de la grilla — scrollea con gesto horizontal nativo y deja el gesto vertical para el drag hacia la grilla.
+
+### Bugs introducidos y corregidos
+
+- Panel "Sin agendar": el drag no manejaba `pointercancel` — en mobile, si el browser interpretaba el gesto como scroll horizontal de la bandeja, el clon flotante quedaba pegado en pantalla, los listeners quedaban colgados y el siguiente click sobre el ítem se perdía. Detectado por Duck en la revisión, corregido antes de entregar.
+
+---
+
 ## [1.1.0] - 2026-07-15
 
 ### Mejoras entregadas
