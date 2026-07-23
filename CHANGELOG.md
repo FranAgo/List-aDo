@@ -16,6 +16,26 @@ Si una sección no aplica en una entrega, no aparece — no se dejan secciones v
 
 ---
 
+## [1.5.0] - 2026-07-23
+
+### Mejoras entregadas
+
+- Panel "Sin agendar": el filtro de lista dejó de ser un `<select>` nativo (el sistema operativo dibuja sus opciones y no se pueden estilar) y ahora es un dropdown propio — cada lista con su punto de color, el conteo como badge, la opción activa resaltada con el acento, y cierre al clickear afuera.
+- Panel "Sin agendar": más contraste — ítems con fondo más claro en gradiente, borde más marcado y título del panel más presente.
+- Vista Calendario (toolbar): la pill activa de Mes/Semana/Día ahora **viaja** de un botón al otro al cambiar de vista (Web Animations API, mismo lenguaje que el liquid glass de la cat-bar; respeta `prefers-reduced-motion`).
+- Vista Calendario: al cambiar entre Mes/Semana/Día, el cuerpo del calendario hace una transición de salida/entrada (fade + leve desplazamiento) en vez de aparecer de golpe.
+- Cat-bar: el capsule del liquid glass ahora se tiñe de celeste al posarse sobre "Calendario", igual que hace con los colores de las listas reales (antes caía al gris por defecto).
+
+### Bugs corregidos
+
+- Panel "Sin agendar": las tareas se veían aplastadas e ilegibles cuando la lista superaba el alto del panel — los ítems de una columna flex con `max-height` se comprimen entre sí salvo que tengan `flex-shrink: 0`; ahora la lista scrollea como corresponde.
+
+### Bugs introducidos y corregidos
+
+- Filtro del panel: el menú desplegable nuevo nacía siempre visible — el `display: flex` de la hoja de estilos pisa la regla `[hidden] { display: none }` del user-agent. Detectado por Duck en la revisión, corregido con una regla explícita antes de entregar.
+
+---
+
 ## [1.4.0] - 2026-07-23
 
 ### Mejoras entregadas

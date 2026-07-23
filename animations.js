@@ -81,6 +81,12 @@ function resolveColor(btn) {
     );
     return { bg, border: catColors[catName].border };
   }
+  // "Calendario" no es una lista real (sin data-cat) pero tiene color propio:
+  // el mismo celeste hardcodeado en renderCatBar y en la regla .lg-active de
+  // styles.css. La opacidad 0.45 replica el boost ×3.5 de las listas.
+  if (btn?.dataset?.catAction === 'schedule') {
+    return { bg: 'rgba(140,220,255,0.45)', border: 'rgba(140,220,255,0.35)' };
+  }
   return { bg: 'rgba(180,180,180,0.13)', border: 'rgba(200,200,200,0.30)' };
 }
 

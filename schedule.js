@@ -86,9 +86,80 @@ function vividBg(col, opacity) {
 }
 
 // ─── NAVEGACIÓN / TOOLBAR ──────────────────────────────────────────────────────
+// Rect (relativo a .sched-view-switch) de la pill activa ANTES de cambiar de
+// vista — positionSwitchIndicator lo usa para animar el viaje hasta la nueva.
+let _pendingSwitchFrom = null;
+// Evita encolar dos animaciones de salida si se clickea rápido; el render
+// pendiente ya va a leer el state más nuevo.
+let _viewSwapping = false;
+
+function prefersReducedMotion() {
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
 export function switchScheduleView(view) {
+  if (view === state.scheduleView) return;
+  const cont = document.querySelector('.sched-view-switch');
+  const act  = cont ? cont.querySelector('.sched-switch-btn.active') : null;
+  if (act) _pendingSwitchFrom = { left: act.offsetLeft, width: act.offsetWidth };
   state.scheduleView = view;
-  renderScheduleView();
+  animateBodySwap();
+}
+
+/** Fade-out corto del cuerpo actual → render → fade-in del nuevo. Mismo
+ * espíritu que el view-leaving de switchCat en ui.js, con WAAPI en vez de
+ * clases para no tocar CSS global. */
+function animateBodySwap() {
+  const body = document.getElementById('sched-body');
+  if (!body || prefersReducedMotion() || typeof body.animate !== 'function') {
+    renderScheduleView();
+    return;
+  }
+  if (_viewSwapping) return;
+  _viewSwapping = true;
+  const out = body.animate(
+    [{ opacity: 1, transform: 'translateY(0)' }, { opacity: 0, transform: 'translateY(8px)' }],
+    { duration: 110, easing: 'ease-in', fill: 'forwards' }
+  );
+  out.onfinish = () => {
+    _viewSwapping = false;
+    renderScheduleView();
+    const nb = document.getElementById('sched-body');
+    if (nb && typeof nb.animate === 'function') {
+      nb.animate(
+        [{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'translateY(0)' }],
+        { duration: 200, easing: 'cubic-bezier(.25, .8, .25, 1)' }
+      );
+    }
+  };
+}
+
+/** La pill activa de Mes/Semana/Día es un div .sched-switch-ind posicionado
+ * detrás de los botones (los botones activos quedan con fondo transparente).
+ * En cada render se recrea y se posiciona bajo el botón activo; si hay un
+ * _pendingSwitchFrom capturado, viaja desde ahí — el "viaje" que pidió
+ * Franco, mismo lenguaje que el liquid glass de la cat-bar. */
+function positionSwitchIndicator() {
+  const cont = document.querySelector('.sched-view-switch');
+  if (!cont) return;
+  const act = cont.querySelector('.sched-switch-btn.active');
+  if (!act) return;
+  const ind = document.createElement('div');
+  ind.className = 'sched-switch-ind';
+  cont.prepend(ind);
+  // Leer offsetLeft fuerza layout — la medición ya es válida acá, sin rAF.
+  const to = { left: act.offsetLeft, width: act.offsetWidth };
+  ind.style.left  = to.left + 'px';
+  ind.style.width = to.width + 'px';
+  const from = _pendingSwitchFrom;
+  _pendingSwitchFrom = null;
+  if (from && from.left !== to.left && !prefersReducedMotion() && typeof ind.animate === 'function') {
+    ind.animate(
+      [{ left: from.left + 'px', width: from.width + 'px' },
+       { left: to.left + 'px',   width: to.width + 'px' }],
+      { duration: 300, easing: 'cubic-bezier(.3, 1.2, .35, 1)' }
+    );
+  }
 }
 
 export function navScheduleDate(dir) {
@@ -168,6 +239,7 @@ export function renderScheduleView() {
     </div>`;
 
   wireToolbar(vc);
+  positionSwitchIndicator();
 
   if (view === 'month')      renderMonth();
   else if (view === 'week')  renderWeek();
@@ -565,12 +637,37 @@ function commitDrop(id, pointerEvent, allTracks) {
 function schedPanelHTML(panelTasks, allUnsched) {
   const counts = {};
   allUnsched.forEach(t => { counts[t.category] = (counts[t.category] || 0) + 1; });
-  const opts = [
-    `<option value="all" ${state.schedPanelCat === 'all' ? 'selected' : ''}>Todas las listas (${allUnsched.length})</option>`,
-    ...state.listOrder.map(c =>
-      `<option value="${esc(c)}" ${state.schedPanelCat === c ? 'selected' : ''}>${esc(c)} (${counts[c] || 0})</option>`),
+  const cur = state.schedPanelCat;
+
+  // Dropdown propio en vez de <select>: las opciones de un select nativo las
+  // dibuja el sistema operativo y no se pueden estilar — acá cada lista lleva
+  // su punto de color y el conteo como badge, con el lenguaje de la app.
+  const optHTML = (value, label, n, dotStyle) => `
+    <button class="sched-filter-opt ${cur === value ? 'active' : ''}" data-sched-filter="${esc(value)}" title="${esc(label)}">
+      <span class="sched-filter-dot" style="${dotStyle}"></span>
+      <span class="sched-filter-opt-label">${esc(label)}</span>
+      <span class="sched-filter-count">${n}</span>
+    </button>`;
+  const ALL_DOT = 'background:conic-gradient(#7ab4ff,#b48cff,#ffaa64,#50d2a0,#7ab4ff)';
+  const menuOpts = [
+    optHTML('all', 'Todas las listas', allUnsched.length, ALL_DOT),
+    ...state.listOrder.map(c => optHTML(c, c, counts[c] || 0, `background:${getCatColor(c).text}`)),
   ].join('');
-  const emptyMsg = state.schedPanelCat === 'all'
+  const curLabel = cur === 'all' ? 'Todas las listas' : cur;
+  const curCount = cur === 'all' ? allUnsched.length : (counts[cur] || 0);
+  const curDot   = cur === 'all' ? ALL_DOT : `background:${getCatColor(cur).text}`;
+  const filterHTML = `
+    <div class="sched-filter-wrap" id="sched-filter-wrap">
+      <button class="sched-filter-btn" id="sched-filter-btn" title="Filtrar por lista">
+        <span class="sched-filter-dot" style="${curDot}"></span>
+        <span class="sched-filter-label">${esc(curLabel)}</span>
+        <span class="sched-filter-count">${curCount}</span>
+        <span class="sched-filter-caret">▾</span>
+      </button>
+      <div class="sched-filter-menu" id="sched-filter-menu" hidden>${menuOpts}</div>
+    </div>`;
+
+  const emptyMsg = cur === 'all'
     ? 'No queda nada por agendar.'
     : 'Nada sin agendar en esta lista.';
   const items = panelTasks.map(t => {
@@ -587,19 +684,46 @@ function schedPanelHTML(panelTasks, allUnsched) {
   return `
     <aside class="sched-panel" id="sched-panel">
       <div class="sched-panel-head">Sin agendar</div>
-      <select class="sched-panel-filter" id="sched-panel-filter" title="Filtrar por lista">${opts}</select>
+      ${filterHTML}
       <div class="sched-panel-list">${items || `<div class="sched-panel-empty">${emptyMsg}</div>`}</div>
       <div class="sched-panel-hint">Arrastrá una tarea a la grilla para darle día y horario.</div>
     </aside>`;
 }
 
+// Cierre del menú de filtro al clickear fuera — un solo listener global,
+// registrado la primera vez que se cablea el panel.
+let _filterOutsideBound = false;
+function bindFilterOutsideClose() {
+  if (_filterOutsideBound) return;
+  _filterOutsideBound = true;
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('sched-filter-menu');
+    if (menu && !menu.hidden && !e.target.closest('#sched-filter-wrap')) {
+      menu.hidden = true;
+      document.getElementById('sched-filter-btn')?.classList.remove('open');
+    }
+  });
+}
+
 function wirePanelItems() {
   document.querySelectorAll('.sched-panel-item[data-sched-unsched]').forEach(attachPanelItemDrag);
-  const filterSel = document.getElementById('sched-panel-filter');
-  if (filterSel) filterSel.addEventListener('change', () => {
-    state.schedPanelCat = filterSel.value;
-    renderScheduleView();
-  });
+  const fBtn  = document.getElementById('sched-filter-btn');
+  const fMenu = document.getElementById('sched-filter-menu');
+  if (fBtn && fMenu) {
+    bindFilterOutsideClose();
+    fBtn.addEventListener('click', e => {
+      e.stopPropagation();
+      fMenu.hidden = !fMenu.hidden;
+      fBtn.classList.toggle('open', !fMenu.hidden);
+    });
+    fMenu.querySelectorAll('[data-sched-filter]').forEach(opt => {
+      opt.addEventListener('click', e => {
+        e.stopPropagation();
+        state.schedPanelCat = opt.dataset.schedFilter;
+        renderScheduleView(); // re-render: el menú desaparece cerrado
+      });
+    });
+  }
 }
 
 /** ¿El puntero está sobre el área visible de la grilla horaria (semana/día)?
