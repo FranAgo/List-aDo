@@ -93,6 +93,14 @@ let _pendingSwitchFrom = null;
 // pendiente ya va a leer el state más nuevo.
 let _viewSwapping = false;
 
+// Preservación de scroll a través de re-renders. La toolbar reemplaza todo el
+// innerHTML del view-container: sin restaurar, el re-anclado de scroll del
+// navegador "sube la pantalla" con cada click. _restoreInnerScroll guarda el
+// scrollTop de la grilla horaria (.sched-scroll) solo si se re-renderiza la
+// MISMA vista — al cambiar de vista sí corresponde el autoscroll a las 07:00.
+let _lastRenderedView   = null;
+let _restoreInnerScroll = null;
+
 function prefersReducedMotion() {
   return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
@@ -188,6 +196,10 @@ export function renderScheduleView() {
   const vc = document.getElementById('view-container');
   if (!vc) return;
   const view = state.scheduleView || 'month';
+  const prevWinY     = window.scrollY;
+  const prevScrollEl = vc.querySelector('.sched-scroll');
+  _restoreInnerScroll = (prevScrollEl && _lastRenderedView === view) ? prevScrollEl.scrollTop : null;
+  _lastRenderedView   = view;
   const unsched = unscheduledTasks();
   // Si la lista filtrada ya no existe (renombrada/eliminada), volver a "Todas"
   // en silencio — nunca dejar el panel apuntando a un nombre muerto.
@@ -248,6 +260,12 @@ export function renderScheduleView() {
   // Después de renderizar la grilla: los ítems del panel necesitan que las
   // pistas/celdas destino ya existan en el DOM para poder soltarse sobre ellas.
   wirePanelItems();
+
+  // Restaurar el scroll de página en el mismo task del render, antes del
+  // próximo layout — el usuario se queda exactamente donde estaba.
+  // behavior:'instant' explícito: el html tiene scroll-behavior:smooth y una
+  // llamada sin behavior lo heredaría, animando un "viajecito" en cada click.
+  window.scrollTo({ top: prevWinY, behavior: 'instant' });
 }
 
 function wireToolbar(vc) {
@@ -502,7 +520,15 @@ function wireEmptyTrackClick(trackEl) {
 function autoscrollToHour(h) {
   requestAnimationFrame(() => {
     const scrollEl = document.querySelector('.sched-scroll');
-    if (scrollEl) scrollEl.scrollTop = Math.max(h * ROW_H - 12, 0);
+    if (!scrollEl) return;
+    // Re-render de la misma vista (drop, panel, filtro): mantener donde
+    // estaba el usuario en vez de volver a las 07:00.
+    if (_restoreInnerScroll !== null) {
+      scrollEl.scrollTop  = _restoreInnerScroll;
+      _restoreInnerScroll = null;
+    } else {
+      scrollEl.scrollTop = Math.max(h * ROW_H - 12, 0);
+    }
   });
 }
 

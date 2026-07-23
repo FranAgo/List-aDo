@@ -16,6 +16,15 @@ Si una sección no aplica en una entrega, no aparece — no se dejan secciones v
 
 ---
 
+## [1.5.1] - 2026-07-23
+
+### Bugs corregidos
+
+- Vista Calendario: los botones de la toolbar (‹ › Hoy, Mes/Semana/Día, Sin agendar) hacían que la página se deslizara sola hacia arriba — el re-render reemplaza todo el contenido de la vista y el navegador re-ancla el scroll, y el `scroll-behavior: smooth` del root convertía ese salto en un viaje visible. Ahora el scroll de página se preserva y restaura con `behavior: 'instant'` en el mismo render.
+- Vista Calendario (semana/día): cualquier re-render (soltar una tarea, abrir el panel, cambiar el filtro) reseteaba el scroll interno de la grilla horaria a las 07:00. Ahora, si seguís en la misma vista, la grilla se queda en la hora donde estabas; el autoscroll a las 07:00 corre solo al entrar o cambiar de vista.
+
+---
+
 ## [1.5.0] - 2026-07-23
 
 ### Mejoras entregadas
